@@ -316,7 +316,7 @@ stock Float:SM_CalculateAvgHealth(&iAliveCount=0)
 	new iSurvCount;
 	iAliveCount =0;
 		
-	for (new index = 1; index < MaxClients; index++)
+	for (new index = 1; index <= MaxClients; index++)
 	{
 		if (IsSurvivor(index))
 		{
@@ -358,6 +358,7 @@ stock Float:SM_CalculateAvgHealth(&iAliveCount=0)
 					iAliveCount++;
 					
 					iTotalHealth += iCurrHealth;
+					if (iIncapCount < 0 ) { iIncapCount = 0; } else if (iIncapCount > 2 ) { iIncapCount = 2; }
 					iTotalTempHealth[iIncapCount] += iCurrTemp;
 				}
 				else if (!IsFinale) iAliveCount++;
