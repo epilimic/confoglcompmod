@@ -6,10 +6,10 @@
 #define DEBUG_ER					0
 
 new Handle:kERData = INVALID_HANDLE;
-new Handle:ER_hRemoveCab;
 new Handle:ER_hKillParachutist;
 new bool:ER_bKillParachutist=true;
-new bool:ER_bRemoveCab=true;
+new Handle:ER_hReplaceGhostHurt;
+new bool:ER_bReplaceGhostHurt;
 
 
 #define ER_KV_ACTION_KILL			1
@@ -30,11 +30,12 @@ public ER_OnModuleStart()
 {
 	HookEvent("round_start",ER_RoundStart_Event);
 	
-	ER_hRemoveCab = CreateConVarEx("remove_cabinets", "1", "Removes all health cabinets to further reduce pill density");
 	ER_hKillParachutist = CreateConVarEx("remove_parachutist", "1", "Removes the parachutist from c3m2");
-	HookConVarChange(ER_hRemoveCab,ER_ConVarChange);
+	ER_hReplaceGhostHurt = CreateConVarEx("disable_ghost_hurt", "0", "Replaces all trigger_ghost_hurt with trigger_hurt, blocking ghost spawns from dying.");
 	HookConVarChange(ER_hKillParachutist,ER_ConVarChange);
+	HookConVarChange(ER_hReplaceGhostHurt,ER_ConVarChange);
 	
+	ER_ConVarChange(INVALID_HANDLE, "", "");
 	
 	ER_KV_Load();
 	
@@ -48,8 +49,8 @@ public ER_OnModuleEnd()
 
 public ER_ConVarChange(Handle:convar, const String:oldValue[], const String:newValue[])
 {
-	ER_bRemoveCab = GetConVarBool(ER_hRemoveCab);
 	ER_bKillParachutist = GetConVarBool(ER_hKillParachutist);
+	ER_bReplaceGhostHurt = GetConVarBool(ER_hReplaceGhostHurt);
 }
 
 ER_KV_Close()
@@ -61,13 +62,13 @@ ER_KV_Close()
 
 ER_KV_Load()
 {
-	decl String:sNameBuff[64], String:sDescBuff[256], String:sValBuff[32];
+	decl String:sNameBuff[PLATFORM_MAX_PATH], String:sDescBuff[256], String:sValBuff[32];
 	
 	if(DEBUG_ER || IsDebugEnabled())
 		LogMessage("[ER] Loading EntityRemover KeyValues");
 		
 	kERData = CreateKeyValues("EntityRemover");
-	BuildPath(Path_SM, sNameBuff, sizeof(sNameBuff), "configs/confogl/entityremove.txt"); //Build our filepath
+	BuildConfigPath(sNameBuff, sizeof(sNameBuff), "entityremove.txt"); //Build our filepath
 	if (!FileToKeyValues(kERData, sNameBuff))
 	{
 		LogError("[ER] Couldn't load EntityRemover data!");
@@ -76,7 +77,7 @@ ER_KV_Load()
 	}
 	
 	// Create cvars for all entity removes
-	if(CV_DEBUG || IsDebugEnabled())
+	if(DEBUG_ER || IsDebugEnabled())
 		LogMessage("[ER] Creating entry CVARs");
 	
 	KvGotoFirstSubKey(kERData);
@@ -89,7 +90,7 @@ ER_KV_Load()
 				KvGetString(kERData, "cvar_desc", sDescBuff, sizeof(sDescBuff));
 				KvGetString(kERData, "cvar_val", sValBuff, sizeof(sValBuff));
 				CreateConVarEx(sNameBuff, sValBuff, sDescBuff);
-				if(CV_DEBUG || IsDebugEnabled())
+				if(DEBUG_ER || IsDebugEnabled())
 					LogMessage("[ER] Creating CVAR %s", sNameBuff);
 				
 			} while(KvGotoNextKey(kERData));
@@ -186,20 +187,21 @@ bool:ER_KV_TestConditionString(String:lhsval[], String:rhsval[], condition)
 ER_KV_ParseEntity(Handle:kEntry, iEntity)
 {
 	decl String:sBuffer[64];
-	
+	decl String:mapname[64];
+
 	// Check CVAR for this entry
-	KvGetString(kEntry, "cvar", sBuffer, sizeof(sBuffer));	
+	KvGetString(kEntry, "cvar", sBuffer, sizeof(sBuffer));
 	if(strlen(sBuffer) && !GetConVarBool(FindConVarEx(sBuffer))) return true;
-	
+
 	// Check MapName for this entry
+	GetCurrentMap(mapname, sizeof(mapname));
 	KvGetString(kEntry, "map", sBuffer, sizeof(sBuffer));
-	if(strlen(sBuffer))
-	{
-		decl String:mapname[64];
-		GetCurrentMap(mapname, sizeof(mapname));
-		if(!StrEqual(mapname, sBuffer))
+	if(strlen(sBuffer) && StrContains(sBuffer, mapname) == -1)
 			return true;
-	}
+
+	KvGetString(kEntry, "excludemap", sBuffer, sizeof(sBuffer));
+	if(strlen(sBuffer) && StrContains(sBuffer, mapname) != -1)
+			return true;
 	
 	// Do property check for this entry
 	KvGetString(kEntry, "property", sBuffer, sizeof(sBuffer));
@@ -241,7 +243,7 @@ ER_KV_TakeAction(action, iEntity)
 	{
 		case ER_KV_ACTION_KILL:
 		{
-			if(CV_DEBUG || IsDebugEnabled())
+			if(DEBUG_ER || IsDebugEnabled())
 				LogMessage("[ER]     Killing!");
 			
 			AcceptEntityInput(iEntity, "Kill");
@@ -271,6 +273,54 @@ bool:ER_KillParachutist(ent)
 	return false;
 }
 
+bool:ER_ReplaceTriggerHurtGhost(ent)
+{
+	decl String:buf[32];
+	GetEdictClassname(ent, buf, sizeof(buf));
+	if (StrEqual(buf, "trigger_hurt_ghost"))
+	{
+		// Replace trigger_hurt_ghost with trigger_hurt
+		new replace = CreateEntityByName("trigger_hurt");
+		if (replace == -1) 
+		{
+			LogError("[ER] Could not create trigger_hurt entity!");
+			return false;
+		}
+		
+		// Get modelname
+		decl String:model[16];
+		GetEntPropString(ent, Prop_Data, "m_ModelName", model, sizeof(model));
+		
+		// Get position and rotation
+		decl Float:pos[3], Float:ang[3];
+		GetEntPropVector(ent, Prop_Send, "m_vecOrigin", pos);
+		GetEntPropVector(ent, Prop_Send, "m_angRotation", ang);
+
+		// Kill the old one
+		AcceptEntityInput(ent, "Kill");		
+		
+		// Set the values for the new one
+		DispatchKeyValue(replace, "StartDisabled", "0");
+		DispatchKeyValue(replace, "spawnflags", "67");
+		DispatchKeyValue(replace, "damagetype", "32");
+		DispatchKeyValue(replace, "damagemodel", "0");
+		DispatchKeyValue(replace, "damagecap", "10000");
+		DispatchKeyValue(replace, "damage", "10000");
+		DispatchKeyValue(replace, "model", model);
+		
+		DispatchKeyValue(replace, "filtername", "filter_infected");
+		
+		// Spawn the new one
+		TeleportEntity(replace, pos, ang, NULL_VECTOR);
+		DispatchSpawn(replace);
+		ActivateEntity(replace);
+
+		return true;
+	}
+
+	return false;
+}
+
 public Action:ER_RoundStart_Event(Handle:event, const String:name[], bool:dontBroadcast)
 {
 	CreateTimer(0.3,  ER_RoundStart_Timer);
@@ -281,12 +331,10 @@ public Action:ER_RoundStart_Timer(Handle:timer)
 	if (!IsPluginEnabled()) return;
 	
 	decl String:sBuffer[64];
-	if(CV_DEBUG || IsDebugEnabled())
+	if(DEBUG_ER || IsDebugEnabled())
 		LogMessage("[ER] Starting RoundStart Event");
 	
 	if(kERData != INVALID_HANDLE) KvRewind(kERData);
-	decl Float:fCabinetLocation[2][3];
-	new iCabCount = 0;
 	
 	new iEntCount = GetEntityCount();
 	for (new ent = MAXPLAYERS+1; ent < iEntCount; ent++)
@@ -294,18 +342,15 @@ public Action:ER_RoundStart_Timer(Handle:timer)
 		if (IsValidEntity(ent))
 		{
 			GetEdictClassname(ent, sBuffer, sizeof(sBuffer));
-			if (ER_bRemoveCab && StrEqual("prop_health_cabinet", sBuffer))
+			if (ER_bKillParachutist && ER_KillParachutist(ent))
 			{
-				GetEntPropVector(ent, Prop_Send, "m_vecOrigin", fCabinetLocation[iCabCount]);
-				fCabinetLocation[iCabCount++][2] += 50;
-				AcceptEntityInput(ent, "Kill");
 			}
-			else if (ER_bKillParachutist && ER_KillParachutist(ent))
+			else if (ER_bReplaceGhostHurt, ER_ReplaceTriggerHurtGhost(ent))
 			{
 			}
 			else if (kERData != INVALID_HANDLE && KvJumpToKey(kERData, sBuffer))
 			{
-				if(CV_DEBUG || IsDebugEnabled())
+				if(DEBUG_ER || IsDebugEnabled())
 					LogMessage("[ER] Dealing with an instance of %s", sBuffer);
 				
 				KvGotoFirstSubKey(kERData);
@@ -316,27 +361,6 @@ public Action:ER_RoundStart_Timer(Handle:timer)
 					if(!ER_KV_ParseEntity(kERData, ent)) break;	
 				} while (KvGotoNextKey(kERData));
 				KvRewind(kERData);
-			}
-		}
-	}
-
-	
-	GetCurrentMap(sBuffer, sizeof(sBuffer));
-	if (iCabCount == 0 || !ER_bRemoveCab || StrContains(sBuffer, "c4m2") != -1) return;
-	
-	new Float:fLocation[3];
-	for (new ent = MAXPLAYERS+1; ent < iEntCount; ent++)
-	{
-		for (new i = 0; i < iCabCount; i++)
-		{
-			if (!IsValidEntity(ent)) continue;
-			
-			GetEdictClassname(ent, sBuffer, sizeof(sBuffer));
-			if (!StrEqual("weapon_pain_pills_spawn", sBuffer)) continue;
-			GetEntPropVector(ent, Prop_Send, "m_vecOrigin", fLocation);
-			if (GetVectorDistance(fLocation, fCabinetLocation[i]) < 20.0)
-			{
-				AcceptEntityInput(ent, "Kill");	
 			}
 		}
 	}

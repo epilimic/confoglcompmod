@@ -1164,7 +1164,7 @@ WI_PrecacheModels()
 
 WI_GetMapInfo()
 {
-	if(!Weapon_bUpdateMapInfo || !FindMapId())
+	if(!Weapon_bUpdateMapInfo /* || !FindMapId() */)
 	{
 		return;
 	}

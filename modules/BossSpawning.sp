@@ -48,22 +48,11 @@ public BS_OnMapStart()
 	BS_iWitchCount[1] = 0;
 	
 	GetCurrentMap(BS_sMap, sizeof(BS_sMap));
-	
-	if (!IsPluginEnabled())
-	{
-		if (BS_bEnabled) SetConVarInt(FindConVar("director_tank_bypass_max_flow_travel"), 0);
-		else ResetConVar(FindConVar("director_tank_bypass_max_flow_travel"));
-	}
 }
 
 public BS_ConVarChange(Handle:convar, const String:oldValue[], const String:newValue[])
 {
 	BS_bEnabled = GetConVarBool(BS_hEnabled);
-	if (!IsPluginEnabled())
-	{
-		if (BS_bEnabled) SetConVarInt(FindConVar("director_tank_bypass_max_flow_travel"), 0);
-		else ResetConVar(FindConVar("director_tank_bypass_max_flow_travel"));
-	}
 }
 
 public Action:BS_WitchSpawn(Handle:event, const String:name[], bool:dontBroadcast)
@@ -117,7 +106,7 @@ public Action:BS_TankSpawn(Handle:event, const String:name[], bool:dontBroadcast
 	
 	new iTankClient = GetClientOfUserId(GetEventInt(event, "userid"));
 	
-	if (StrEqual(BS_sMap, "c1m1_hotel")) FixZDistance(iTankClient); // fix elevator spawn on c1m1
+	if (GetMapValueInt("tank_z_fix")) FixZDistance(iTankClient); // fix stuck tank spawns, ex c1m1
 	
 	// If we reach MAX_TANKS, we don't have any room to store their locations
 	if (BS_iTankCount[!BS_bIsFirstRound] >= MAX_TANKS) return;
@@ -159,13 +148,20 @@ public Action:BS_RoundEnd(Handle:event, const String:name[], bool:dontBroadcast)
 {
 	BS_bIsFirstRound = false;
 	BS_bFinaleStarted = false;
-	BS_bDeleteWitches = true;
-	CreateTimer(5.0, BS_WitchTimerReset);
+	if(StrEqual(BS_sMap, "c6m1_riverbank")) {
+		BS_bDeleteWitches = false;
+	} else {
+		BS_bDeleteWitches = true;
+		CreateTimer(5.0, BS_WitchTimerReset);
+	}
 }
 
 public Action:BS_FinaleStart(Handle:event, const String:name[], bool:dontBroadcast) BS_bFinaleStarted = true;
 
-public Action:BS_WitchTimerReset(Handle:timer) BS_bDeleteWitches = false;
+public Action:BS_WitchTimerReset(Handle:timer)
+{
+	BS_bDeleteWitches = false;
+}
 
 FixZDistance(iTankClient)
 {
@@ -174,16 +170,32 @@ FixZDistance(iTankClient)
 	decl index;
 	
 	GetClientAbsOrigin(iTankClient, TankLocation);
+	
+	if (DEBUG_BS || IsDebugEnabled())
+	{
+		LogMessage("[BS] tank z spawn check... Map: %s, Tank Location: %f, %f, %f", BS_sMap, TankLocation[0], TankLocation[1], TankLocation[2]);
+	}
+	
 	for (new i = 0; i < NUM_OF_SURVIVORS; i++)
 	{
+		new Float:distance = GetMapValueFloat("max_tank_z", 99999999999999.9);
 		index = GetSurvivorIndex(i);
 		if (index != 0 && IsValidEntity(index))
 		{
 			GetClientAbsOrigin(index, TempSurvivorLocation);
-			if (TempSurvivorLocation[2] - TankLocation[2] > 1200)
+			
+			if (DEBUG_BS || IsDebugEnabled()) LogMessage("[BS] Survivor %d Location: %f, %f, %f", i, TempSurvivorLocation[0], TempSurvivorLocation[1], TempSurvivorLocation[2]);
+			
+			if (FloatAbs(TempSurvivorLocation[2] - TankLocation[2]) > distance)
 			{
-				new Float:ElevatorLocation[3] = { 2168.357666, 5803.427734, 2464.031250 };
-				TeleportEntity(iTankClient, ElevatorLocation, NULL_VECTOR, NULL_VECTOR);
+				new Float:WarpToLocation[3];
+				GetMapValueVector("tank_warpto", WarpToLocation);
+				if (!GetVectorLength(WarpToLocation, true))
+				{
+					LogMessage("[BS] tank_warpto missing from mapinfo.txt");
+					return;
+				}
+				TeleportEntity(iTankClient, WarpToLocation, NULL_VECTOR, NULL_VECTOR);
 			}
 		}
 	}

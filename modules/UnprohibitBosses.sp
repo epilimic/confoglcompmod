@@ -1,5 +1,6 @@
 #include <sourcemod>
 #include <sdktools>
+#include <left4downtown>
 
 new Handle:UB_hEnable;
 new bool:UB_bEnabled = true;
@@ -18,9 +19,36 @@ public UB_ConVarChange(Handle:convar, const String:oldValue[], const String:newV
 	UB_bEnabled = GetConVarBool(UB_hEnable);
 }
 
-public Action:L4D_OnGetScriptValueInt(const String:key[], &retVal)
+Action:UB_OnGetScriptValueInt(const String:key[], &retVal)
 {
-	if(!IsPluginEnabled() || !UB_bEnabled || !StrEqual(key, "ProhibitBosses")){return Plugin_Continue;}
-	retVal = 0;
-	return Plugin_Handled;
+	if(IsPluginEnabled() && UB_bEnabled)
+	{
+		if(StrEqual(key, "DisallowThreatType"))
+		{
+			retVal = 0;
+			return Plugin_Handled;
+		}
+		
+		if(StrEqual(key, "ProhibitBosses"))
+		{
+			retVal = 0;
+			return Plugin_Handled;		
+		}
+	}
+	return Plugin_Continue;
+}
+
+Action:UB_OnGetMissionVSBossSpawning()
+{
+	if(UB_bEnabled)
+	{
+		decl String:mapbuf[32];
+		GetCurrentMap(mapbuf, sizeof(mapbuf));
+		if(StrEqual(mapbuf, "c7m1_docks") || StrEqual(mapbuf, "c13m2_southpinestream"))
+		{
+			return Plugin_Continue;
+		}
+		return Plugin_Handled;
+	}
+	return Plugin_Continue;
 }
