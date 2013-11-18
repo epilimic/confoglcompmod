@@ -1,11 +1,11 @@
 #pragma semicolon 1
 #include <sourcemod>
 
-#define CVAR_PREFIX			"lgofnoc_"
+#define CVAR_PREFIX			"confogl_"
 #define CVAR_FLAGS			FCVAR_PLUGIN
 #define CVAR_PRIVATE		(FCVAR_DONTRECORD|FCVAR_PROTECTED)
 
-stock Handle:CreateConVarEx(const String:name[], const String:defaultValue[], const String:description[]="", flags=0, bool:hasMin=false, Float:min=0.0, bool:hasMax=false, Float:max=0.0)
+Handle:CreateConVarEx(const String:name[], const String:defaultValue[], const String:description[]="", flags=0, bool:hasMin=false, Float:min=0.0, bool:hasMax=false, Float:max=0.0)
 {
 	decl String:sBuffer[128], Handle:cvar;
 	Format(sBuffer,sizeof(sBuffer),"%s%s",CVAR_PREFIX,name);
@@ -15,14 +15,16 @@ stock Handle:CreateConVarEx(const String:name[], const String:defaultValue[], co
 	return cvar;
 }
 
-stock Handle:FindConVarEx(const String:name[])
+Handle:FindConVarEx(const String:name[])
 {
 	decl String:sBuffer[128];
 	Format(sBuffer,sizeof(sBuffer),"%s%s",CVAR_PREFIX,name);
 	return FindConVar(sBuffer);
 }
 
-stock bool:IsHumansOnServer()
+new bool:bIsPluginEnabled = false;
+
+bool:IsHumansOnServer()
 {
 	for(new i=1;i<=MaxClients;i++)
 	{
@@ -32,6 +34,58 @@ stock bool:IsHumansOnServer()
 		}
 	}
 	return false;
+}
+
+bool:IsVersus()
+{
+	decl String:GameMode[32];
+	GetConVarString(FindConVar("mp_gamemode"), GameMode, sizeof(GameMode));
+	if(StrContains(GameMode, "versus", false) != -1)
+	{
+		return true;
+	}
+	return false;
+}
+
+bool:IsScavenge()
+{
+	decl String:GameMode[32];
+	GetConVarString(FindConVar("mp_gamemode"), GameMode, sizeof(GameMode));
+	if(StrContains(GameMode, "scavenge", false) != -1)
+	{
+		return true;
+	}
+	return false;
+}
+
+bool:IsPluginEnabled(bool:bSetStatus=false,bool:bStatus=false)
+{
+	if(bSetStatus)
+	{
+		bIsPluginEnabled = bStatus;
+	}
+	return bIsPluginEnabled;
+}
+
+stock GetSurvivorPermanentHealth(client)
+{
+	return GetEntProp(client, Prop_Send, "m_iHealth");
+}
+
+stock GetSurvivorTempHealth(client)
+{
+	new temphp = RoundToCeil(GetEntPropFloat(client, Prop_Send, "m_healthBuffer") - ((GetGameTime() - GetEntPropFloat(client, Prop_Send, "m_healthBufferTime")) * GetConVarFloat(FindConVar("pain_pills_decay_rate")))) - 1;
+	return temphp > 0 ? temphp : 0;
+}
+
+stock GetSurvivorIncapCount(client)
+{
+	return GetEntProp(client, Prop_Send, "m_currentReviveCount");
+}
+
+stock bool:IsSurvivor(client)
+{
+	return IsClientInGame(client) && GetClientTeam(client) == 2;
 }
 
 stock ZeroVector(Float:vector[3])
