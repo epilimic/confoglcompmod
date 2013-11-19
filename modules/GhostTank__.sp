@@ -221,7 +221,7 @@ public GT_TankOnFire(Handle:event, const String:name[], bool:dontBroadcast)
     if(!g_bGT_TankIsInPlay || !g_bGT_TankHasFireImmunity || !IsPluginEnabled() || !GetConVarBool(g_hGT_Enabled)) return;
     
     new client = GetClientOfUserId(GetEventInt(event, "userid"));
-    if(g_iGT_TankClient != client || !IsValidClient(client)) return;
+    if(g_iGT_TankClient != client) return;
     
     new dmgtype = GetEventInt(event,"type");
     
@@ -243,7 +243,6 @@ public GT_PlayerIncap(Handle:event, String:event_name[], bool:dontBroadcast)
     if(!StrEqual(weapon, "tank_claw")) return;
     
     new client = GetClientOfUserId(GetEventInt(event, "userid"));
-    if(!IsValidClient(client)) return;
     
     SetEntProp(client, Prop_Send, "m_isIncapacitated", 0);
     SetEntityHealth(client, 1);
@@ -412,10 +411,7 @@ GT_SpecHUD_Draw()
     DrawPanelText(g_hGT_SpecHUD, sTempString);
     
     // Draw health
-    new health = 0;
-    if(IsValidClient(g_iGT_TankClient))
-        health = GetClientHealth(g_iGT_TankClient);
-    
+    new health = GetClientHealth(g_iGT_TankClient);
     if(g_iGT_SpecHUD_LastHealth < health)
     {
         sTempString = "  Health  : Dead";
@@ -444,7 +440,7 @@ GT_SpecHUD_Draw()
     DrawPanelText(g_hGT_SpecHUD, sTempString);
     
     // Draw fire status
-    if(IsValidClient(g_iGT_TankClient) && GetEntityFlags(g_iGT_TankClient) & FL_ONFIRE)
+    if(GetEntityFlags(g_iGT_TankClient) & FL_ONFIRE)
     {
         new timeleft = RoundToCeil(health / 80.0);
         Format(sTempString, sizeof(sTempString), "  OnFire. : Yes, %i sec",timeleft);
