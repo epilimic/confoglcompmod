@@ -1162,14 +1162,9 @@ WI_PrecacheModels()
 //================================================
 // Updates the global map variables if needed
 
-
-// why would it need to know the mapid?
-//  apparently to check for custom campaigns
-//  but why take that sloppy-arsed, hard-coded approach to it?
-
 WI_GetMapInfo()
 {
-	if(!Weapon_bUpdateMapInfo /*|| !FindMapId()*/)
+	if(!Weapon_bUpdateMapInfo /* || !FindMapId() */)
 	{
 		return;
 	}

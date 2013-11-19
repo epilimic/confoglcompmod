@@ -98,8 +98,10 @@ public Action:WS_JockeyRideEnd(Handle:event, const String:name[], bool:dontBroad
 	new jockey = GetClientOfUserId(GetEventInt(event, "userid"));
 	
 	WS_bJockeyInWater = false;
-	if(!IsValidEntity(jockey)){return;}
-	SetEntPropFloat(jockey,Prop_Send,"m_flLaggedMovementValue",1.0);
+	if(jockey && IsValidEntity(jockey))
+	{
+		SetEntPropFloat(jockey,Prop_Send,"m_flLaggedMovementValue",1.0);
+	}
 }
 
 WS_SetStatus(bool:enable=true)

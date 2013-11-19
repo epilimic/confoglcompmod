@@ -6,22 +6,6 @@
 
 #define DEBUG_MI					0
 
-
-/*
-    #define NUM_OF_MAPS                 26
-
-    static const String:MapList[NUM_OF_MAPS][] = {
-            "c1m1_hotel", "c1m2_streets", "c1m3_mall", "c1m4_atrium",
-            "c2m1_highway", "c2m2_fairgrounds", "c2m3_coaster", "c2m4_barns", "c2m5_concert",
-            "c3m1_plankcountry", "c3m2_swamp", "c3m3_shantytown", "c3m4_plantation",
-            "c4m1_milltown_a", "c4m2_sugarmill_a", "c4m3_sugarmill_b", "c4m4_milltown_b", "c4m5_milltown_escape",
-            "c5m1_waterfront", "c5m2_park", "c5m3_cemetery", "c5m4_quarter", "c5m5_bridge",
-            "c6m1_riverbank", "c6m2_bedlam", "c6m3_port"
-    };
-
-    new MapId;
-*/
-
 new Handle:kMIData = INVALID_HANDLE;
 
 static bool:MapDataAvailable;
@@ -48,12 +32,12 @@ public MI_OnModuleStart()
 
 MI_APL()
 {
-    CreateNative("LGO_IsMapDataAvailable", _native_IsMapDataAvailable);
-    CreateNative("LGO_GetMapValueInt", _native_GetMapValueInt);
-    CreateNative("LGO_GetMapValueFloat", _native_GetMapValueFloat);
-    CreateNative("LGO_GetMapValueVector", _native_GetMapValueVector);
-    CreateNative("LGO_GetMapValueString", _native_GetMapValueString);
-    CreateNative("LGO_CopyMapSubsection", _native_CopyMapSubsection);
+	CreateNative("LGO_IsMapDataAvailable", _native_IsMapDataAvailable);
+	CreateNative("LGO_GetMapValueInt", _native_GetMapValueInt);
+	CreateNative("LGO_GetMapValueFloat", _native_GetMapValueFloat);
+	CreateNative("LGO_GetMapValueVector", _native_GetMapValueVector);
+	CreateNative("LGO_GetMapValueString", _native_GetMapValueString);
+	CreateNative("LGO_CopyMapSubsection", _native_CopyMapSubsection);
 }
 
 public MI_OnMapStart()
@@ -407,98 +391,79 @@ stock Float:GetMapStartExtraDist()
 	return Start_Extra_Dist;
 }
 
-
-/*
-bool:FindMapId()
-{
-    decl String:sMapName[32],id;
-    GetCurrentMap(sMapName,32);
-
-    for(id=0;id<NUM_OF_MAPS;id++)
-    {
-        if(!StrEqual(sMapName,MapList[id])){continue;}
-
-        MapId = id;
-        return true;
-    }
-    return false;
-}
-*/
-
-
 public _native_IsMapDataAvailable(Handle:plugin, numParams)
 {
-    return IsMapDataAvailable();
+	return IsMapDataAvailable();
 }
 
 public _native_GetMapValueInt(Handle:plugin, numParams)
 {
-    decl len, defval;
-
-    GetNativeStringLength(1, len);
-    new String:key[len+1];
-    GetNativeString(1, key, len+1);
-
-    defval = GetNativeCellRef(2);
-
-    return GetMapValueInt(key, defval);
+	decl len, defval;
+	
+	GetNativeStringLength(1, len);
+	new String:key[len+1];
+	GetNativeString(1, key, len+1);
+	
+	defval = GetNativeCellRef(2);
+	
+	return GetMapValueInt(key, defval);
 }
 
 public _native_GetMapValueFloat(Handle:plugin, numParams)
 {
-    decl len, Float:defval;
-
-    GetNativeStringLength(1, len);
-    new String:key[len+1];
-    GetNativeString(1, key, len+1);
-
-    defval = GetNativeCellRef(2);
-
-    return _:GetMapValueFloat(key, defval);
+	decl len, Float:defval;
+	
+	GetNativeStringLength(1, len);
+	new String:key[len+1];
+	GetNativeString(1, key, len+1);
+	
+	defval = GetNativeCellRef(2);
+	
+	return _:GetMapValueFloat(key, defval);
 }
 
 public _native_GetMapValueVector(Handle:plugin, numParams)
 {
-    decl len, Float:defval[3], Float:value[3];
-
-    GetNativeStringLength(1, len);
-    new String:key[len+1];
-    GetNativeString(1, key, len+1);
-
-    GetNativeArray(3, defval, 3);
-
-    GetMapValueVector(key, value, defval);
-
-    SetNativeArray(2, value, 3);
+	decl len, Float:defval[3], Float:value[3];
+	
+	GetNativeStringLength(1, len);
+	new String:key[len+1];
+	GetNativeString(1, key, len+1);
+	
+	GetNativeArray(3, defval, 3);
+	
+	GetMapValueVector(key, value, defval);
+	
+	SetNativeArray(2, value, 3);
 }
 
 public _native_GetMapValueString(Handle:plugin, numParams)
 {
-    decl len;
-    GetNativeStringLength(1, len);
-    new String:key[len+1];
-    GetNativeString(1, key, len+1);
-
-    GetNativeStringLength(4, len);
-    new String:defval[len+1];
-    GetNativeString(4, defval, len+1);
-
-    len = GetNativeCell(3);
-    new String:buf[len+1];
-
-    GetMapValueString(key, buf, len, defval);
-
-    SetNativeString(2, buf, len);
+	decl len;
+	GetNativeStringLength(1, len);
+	new String:key[len+1];
+	GetNativeString(1, key, len+1);
+	
+	GetNativeStringLength(4, len);
+	new String:defval[len+1];
+	GetNativeString(4, defval, len+1);
+	
+	len = GetNativeCell(3);
+	new String:buf[len+1];
+	
+	GetMapValueString(key, buf, len, defval);
+	
+	SetNativeString(2, buf, len);
 }
 
 public _native_CopyMapSubsection(Handle:plugin, numParams)
 {
-    decl len, Handle:kv;
-    GetNativeStringLength(2, len);
-    new String:key[len+1];
-    GetNativeString(2, key, len+1);
-
-    kv = GetNativeCell(1);
-
-    CopyMapSubsection(kv, key);
+	decl len, Handle:kv;
+	GetNativeStringLength(2, len);
+	new String:key[len+1];
+	GetNativeString(2, key, len+1);
+	
+	kv = GetNativeCell(1);
+	
+	CopyMapSubsection(kv, key);
 }

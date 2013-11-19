@@ -358,7 +358,7 @@ stock Float:SM_CalculateAvgHealth(&iAliveCount=0)
 					iAliveCount++;
 					
 					iTotalHealth += iCurrHealth;
-					if (iIncapCount < 0 ) { iIncapCount = 0; } else if (iIncapCount > 2 ) { iIncapCount = 2; }
+                    if (iIncapCount < 0 ) { iIncapCount = 0; } else if (iIncapCount > 2 ) { iIncapCount = 2; }
 					iTotalTempHealth[iIncapCount] += iCurrTemp;
 				}
 				else if (!IsFinale) iAliveCount++;

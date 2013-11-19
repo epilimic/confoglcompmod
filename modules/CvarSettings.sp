@@ -252,6 +252,6 @@ public CVS_ConVarChange(Handle:convar, const String:oldValue[], const String:new
 	{
 		decl String:name[CVS_CVAR_MAXLEN];
 		GetConVarName(convar, name, sizeof(name));
-		PrintToChatAll("\x01[\x05Confogl\x01] Tracked Server CVar \"\x04%s\x01\" changed from \"\x04%s\x01\" to \"\x04%s\x01\" !!!", name, oldValue, newValue);
+		PrintToChatAll("!!! [Confogl] Tracked Server CVar \"%s\" changed from \"%s\" to \"%s\" !!!", name, oldValue, newValue);
 	}
 }
