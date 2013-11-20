@@ -17,7 +17,7 @@ new 	bool:	CV_bHaveNotified	= false;
 
 CV_OnModuleStart()
 {
-	CV_hNotify = CreateConVarEx("match_checkversion","1","Check the current running version of Confogl to Confogl's homepage. Will notify players if the server is running an outdated version of Confogl");
+	CV_hNotify = CreateConVarEx("match_checkversion","0","Check the current running version of Confogl to Confogl's homepage. Will notify players if the server is running an outdated version of Confogl");
 	HookConVarChange(CV_hNotify,CV_ConVarChange);
 	
 	CV_bNotify = GetConVarBool(CV_hNotify);

@@ -38,6 +38,7 @@ RM_OnModuleStart()
 	
 	//RegConsoleCmd("sm_match", RM_Cmd_Match);
 	RegAdminCmd("sm_forcematch",	RM_Cmd_ForceMatch, ADMFLAG_CONFIG, "Forces the game to use match mode");
+	RegAdminCmd("sm_fm",	RM_Cmd_ForceMatch, ADMFLAG_CONFIG, "Forces the game to use match mode");
 	RegAdminCmd("sm_resetmatch",	RM_Cmd_ResetMatch, ADMFLAG_CONFIG, "Forces match mode to turn off REGRADLESS for always on or forced match");
 	
 	RM_hReloaded = FindConVarEx("match_reloaded");
