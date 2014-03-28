@@ -12,7 +12,7 @@ new String:WC_sLastWeapon[64];
 
 public WC_OnModuleStart()
 {
-	WC_hLimitCount = CreateConVarEx("limit_hr", "1", "Limits the maximum number of hunting rifles at one time to this number", 0, true, 0.0, true, 4.0);
+	WC_hLimitCount = CreateConVarEx("limit_sniper", "1", "Limits the maximum number of sniping rifles at one time to this number", 0, true, 0.0, true, 4.0);
 	HookConVarChange(WC_hLimitCount, WC_ConVarChange);
 	
 	WC_iLimitCount = GetConVarInt(WC_hLimitCount);
@@ -47,14 +47,14 @@ public Action:WC_PlayerUse_Event(Handle:event, const String:name[], bool:dontBro
 	decl String:primary_name[64];
 	GetEdictClassname(primary, primary_name, sizeof(primary_name));
 	
-	if (StrEqual(primary_name, "weapon_hunting_rifle") || StrEqual(primary_name, "weapon_sniper_military"))
+	if (StrEqual(primary_name, "weapon_hunting_rifle") || StrEqual(primary_name, "weapon_sniper_military") || StrEqual(primary_name, "weapon_sniper_awp") || StrEqual(primary_name, "weapon_sniper_scout") || StrEqual(primary_name, "weapon_rifle_sg552"))
 	{
-		if (HuntingRifleCount(client) >= WC_iLimitCount)
+		if (SniperCount(client) >= WC_iLimitCount)
 		{
 			if (IsValidEdict(primary))
 			{
 				RemovePlayerItem(client, primary);
-				PrintToChat(client, "\x01[\x05Confogl\x01] Maximum \x04%d \x01hunting rifle(s) is enforced.", WC_iLimitCount);
+				PrintToChat(client, "\x01[\x05Confogl\x01] Maximum \x04%d \x01sniping rifle(s) is enforced.", WC_iLimitCount);
 			}
 			
 			if (WC_iLastClient == client)
@@ -79,7 +79,7 @@ public Action:WC_PlayerUse_Event(Handle:event, const String:name[], bool:dontBro
 	WC_sLastWeapon[0] = 0;
 }
 
-HuntingRifleCount(client)
+SniperCount(client)
 {
 	new count = 0;
 	for (new i = 0; i < 4; i++)
@@ -92,7 +92,7 @@ HuntingRifleCount(client)
 			{
 				decl String:temp[64];
 				GetEdictClassname(ent, temp, sizeof(temp));
-				if (StrEqual(temp, "weapon_hunting_rifle") || StrEqual(temp, "weapon_sniper_military")) count++;
+				if (StrEqual(temp, "weapon_hunting_rifle") || StrEqual(temp, "weapon_sniper_military") || StrEqual(temp, "weapon_sniper_awp") || StrEqual(temp, "weapon_sniper_scout") || StrEqual(temp, "weapon_rifle_sg552")) count++;
 			}
 		}
 	}

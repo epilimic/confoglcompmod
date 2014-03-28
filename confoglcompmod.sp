@@ -42,7 +42,7 @@
 #include "modules/l4dt_forwards.sp"
 #include "modules/ClientSettings.sp"
 #include "modules/ItemTracking.sp"
-#include "modules/SpectatorHud.sp"
+//#include "modules/SpectatorHud.sp"
 
 public Plugin:myinfo = 
 {
@@ -82,7 +82,7 @@ public OnPluginStart()
 	WC_OnModuleStart();
 	CLS_OnModuleStart();
 	IT_OnModuleStart();
-	SH_OnModuleStart();
+	//SH_OnModuleStart();
 	
 	AddCustomServerTag("confogl", true);
 }
@@ -138,8 +138,8 @@ public OnConfigsExecuted()
 public OnClientDisconnect(client)
 {
 	RM_OnClientDisconnect(client);
-	GT_OnClientDisconnect(client);
-	SH_OnClientDisconnect(client);
+	//GT_OnClientDisconnect(client);
+	//SH_OnClientDisconnect(client);
 }
 
 public OnClientPutInServer(client)

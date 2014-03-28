@@ -19,11 +19,12 @@ new		bool:	g_bGT_FinaleVehicleIncoming;
 
 new		Handle:	g_hGT_BlockPunchRock;
 
-new 	Handle:	g_hGT_SpecHUD;
+/*new 	Handle:	g_hGT_SpecHUD;
 new 			g_iGT_SpecHUD_LastHealth;
 new		Handle:	g_hGT_SpecHUD_TankHealth;
 new 	bool:	g_bGT_SpecHUD_ShowPanel[MAXPLAYERS+1] 	= true;
 new 	bool:	g_bGT_SpecHUD_ShowHint[MAXPLAYERS+1] 	= true;
+*/
 new passes;
 
 // Disable Tank Hordes items
@@ -43,9 +44,9 @@ GT_OnModuleStart()
     HookEvent("item_pickup", GT_ItemPickup);
     HookEvent("player_incapacitated", GT_PlayerIncap);
     HookEvent("finale_vehicle_incoming", GT_FinaleVehicleIncoming);
-    RegConsoleCmd("tankhud",GT_SpecHUD_Command,"Toggles Confogl\'s Tank Spectate HUD");
-    g_hGT_SpecHUD_TankHealth = FindConVar("z_tank_health");
-    g_iGT_SpecHUD_LastHealth = RoundFloat(GetConVarFloat(g_hGT_SpecHUD_TankHealth)*1.5);
+    //RegConsoleCmd("tankhud",GT_SpecHUD_Command,"Toggles Confogl\'s Tank Spectate HUD");
+    //g_hGT_SpecHUD_TankHealth = FindConVar("z_tank_health");
+    //g_iGT_SpecHUD_LastHealth = RoundFloat(GetConVarFloat(g_hGT_SpecHUD_TankHealth)*1.5);
 }
 
 // For other modules to use
@@ -201,7 +202,7 @@ public GT_TankSpawn(Handle:event, const String:name[], bool:dontBroadcast)
     
     
     // Spec HUD
-    CreateTimer(SPECHUD_UPDATEINTERVAL, GT_SpecHUD_Timer, INVALID_HANDLE, TIMER_REPEAT);
+    //CreateTimer(SPECHUD_UPDATEINTERVAL, GT_SpecHUD_Timer, INVALID_HANDLE, TIMER_REPEAT);
     
     new Float:fFireImmunityTime = FIREIMMUNITY_TIME;
     new Float:fSelectionTime = GetConVarFloat(FindConVar("director_tank_lottery_selection_time"));
@@ -292,7 +293,7 @@ GT_Reset()
     }
     g_bGT_TankIsInPlay = false;
     g_bGT_TankHasFireImmunity = true;
-    g_iGT_SpecHUD_LastHealth = RoundFloat(GetConVarFloat(g_hGT_SpecHUD_TankHealth)*1.5);
+    //g_iGT_SpecHUD_LastHealth = RoundFloat(GetConVarFloat(g_hGT_SpecHUD_TankHealth)*1.5);
 }
 
 public Action:GT_TankKilled_Timer(Handle:timer)
@@ -304,7 +305,7 @@ public Action:GT_TankKilled_Timer(Handle:timer)
 // //////////////////////////////////////////////
 // Spec Hud
 // //////////////////////////////////////////////
-public Action:GT_SpecHUD_Timer(Handle:timer)
+/*public Action:GT_SpecHUD_Timer(Handle:timer)
 {
     GT_SpecHUD_Draw();
     GT_SpecHUD_Update();
@@ -354,7 +355,8 @@ GT_SpecHUD_Update()
         if(!IsValidClient(client)) continue;
         team = GetClientTeam(client);
         if(team == 2 || IsFakeClient(client) || !g_bGT_SpecHUD_ShowPanel[client] 
-            || (team == 1 && IsClientUsingSpecHud(client)) || client == g_iGT_TankClient) 
+            || client == g_iGT_TankClient) 
+            //|| (team == 1 && IsClientUsingSpecHud(client)) || client == g_iGT_TankClient) 
         continue; 
         
         SendPanelToClient(g_hGT_SpecHUD, client, GT_SpecHUD_MenuHandler, 3);
@@ -455,6 +457,7 @@ GT_SpecHUD_Draw()
 public GT_SpecHUD_MenuHandler(Handle:menu, MenuAction:action, param1, param2)
 {
 }
+*/
 
 bool:IsValidClient(client)
 {
