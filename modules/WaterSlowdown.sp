@@ -3,17 +3,17 @@
 #include <sourcemod>
 #include <sdktools>
 
-#define	SLOWDOWN_FACTOR	0.90
-
 new bool:WS_bEnabled = true;
 new Handle:WS_hEnable;
+new Handle:WS_hFactor;
 
 new bool:WS_bPlayerInWater[MAXPLAYERS+1];
 new bool:WS_bJockeyInWater = false;
 
 WS_OnModuleStart()
 {
-	WS_hEnable = CreateConVarEx("waterslowdown","1", "Sets whether water will slowdown the survivors by another 15%");
+	WS_hEnable = CreateConVarEx("waterslowdown","1", "Enables additional water slowdown");
+	WS_hFactor = CreateConVarEx("slowdown_factor", "0.90", "Sets how much water will slow down survivors. 1.00 = Vanilla");
 	
 	HookConVarChange(WS_hEnable,WS_ConVarChange);
 	HookEvent("round_start", WS_RoundStart);
@@ -45,7 +45,7 @@ WS_OnGameFrame()
 					if(!WS_bPlayerInWater[client])
 					{
 						WS_bPlayerInWater[client] = true;
-						SetEntPropFloat(client,Prop_Send,"m_flLaggedMovementValue",SLOWDOWN_FACTOR);
+						SetEntPropFloat(client,Prop_Send,"m_flLaggedMovementValue",GetConVarFloat(WS_hFactor));
 					}
 				}
 				else
@@ -84,7 +84,7 @@ public Action:WS_JockeyRide(Handle:event, const String:name[], bool:dontBroadcas
 	if(WS_bPlayerInWater[victim] && !WS_bJockeyInWater)
 	{
 		WS_bJockeyInWater = true;
-		SetEntPropFloat(jockey,Prop_Send,"m_flLaggedMovementValue",SLOWDOWN_FACTOR);
+		SetEntPropFloat(jockey,Prop_Send,"m_flLaggedMovementValue",GetConVarFloat(WS_hFactor));
 	}
 	else if(!WS_bPlayerInWater[victim] && WS_bJockeyInWater)
 	{
