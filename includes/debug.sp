@@ -1,3 +1,5 @@
+#pragma semicolon 1
+#pragma newdecls required
 
 #if DEBUG_ALL
 #define DEBUG_DEFAULT "1"
@@ -5,21 +7,32 @@
 #define DEBUG_DEFAULT "0"
 #endif
 
-new bool:debug_confogl;
+bool debug_confogl;
 
-public Debug_OnModuleStart()
+ConVar cvDebugConVar;
+
+public void Debug_OnModuleStart()
 {
-    new Handle:hDebugConVar = CreateConVarEx("debug", DEBUG_DEFAULT, "Turn on Debug Logging in all Confogl Modules");
-    HookConVarChange(hDebugConVar, Debug_ConVarChange);
-    debug_confogl = GetConVarBool(hDebugConVar);
+    cvDebugConVar = CreateConVarEx("debug", DEBUG_DEFAULT, "Turn on Debug Logging in all Confogl Modules");
+    cvDebugConVar.AddChangeHook(Debug_ConVarChange);
+    debug_confogl = cvDebugConVar.BoolValue;
 }
 
-public Debug_ConVarChange(Handle:convar, const String:oldValue[], const String:newValue[])
+public void Debug_ConVarChange(ConVar convar, const char[] oldValue, const char[] newValue)
 {
-    debug_confogl = bool:StringToInt(newValue);
+    debug_confogl = cvDebugConVar.BoolValue;
 }
 
-stock bool:IsDebugEnabled()
+stock bool IsDebugEnabled()
 {
     return debug_confogl || DEBUG_ALL;
+}
+
+void Debug_LogMessage(const char[] msg, any ...)
+{
+    if (!IsDebugEnabled()) return;
+
+    char buf[512];
+    VFormat(buf, sizeof(buf), msg, 2);
+    LogMessage(buf);
 }

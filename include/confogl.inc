@@ -35,7 +35,7 @@
  * 
  * @noreturn
  */
-forward LGO_OnMatchModeLoaded();
+forward void LGO_OnMatchModeLoaded();
 
 /**
  * @brief Called when matchmode is un-loaded, before map restart.
@@ -43,7 +43,7 @@ forward LGO_OnMatchModeLoaded();
  * 
  * @noreturn
  */
-forward LGO_OnMatchModeLoaded();
+forward void LGO_OnMatchModeUnloaded();
 
 /**
  * @brief Tells if a confogl match is currently running
@@ -51,7 +51,7 @@ forward LGO_OnMatchModeLoaded();
  * 
  * @return 	True if matchmode is loaded, false otherwise
  */
-native bool:LGO_IsMatchModeLoaded();
+native bool LGO_IsMatchModeLoaded();
 
 /**
  * @brief Build a filepath relative to the current running config.
@@ -62,7 +62,7 @@ native bool:LGO_IsMatchModeLoaded();
  * @param sFileName	Name of the file to look for in the config
  * @noreturn
  */
-native LGO_BuildConfigPath(String:buffer[], maxlength, const String:sFileName[]);
+native void LGO_BuildConfigPath(char[] buffer, int maxlength, const char[] sFileName);
 
 /**
  * @brief Execute a cfg file for the current config
@@ -71,7 +71,7 @@ native LGO_BuildConfigPath(String:buffer[], maxlength, const String:sFileName[])
  * @param sFileName	Name of the cfg file to execute
  * @noreturn
  */
-native LGO_ExecuteConfigCfg(const String:sFileName[]);
+native void LGO_ExecuteConfigCfg(const char[] sFileName);
 
 /**
  * @brief Tells if map data is available
@@ -79,7 +79,7 @@ native LGO_ExecuteConfigCfg(const String:sFileName[]);
  * 
  * @return 	True if map data is available, false if it is not.
  */
-native bool:LGO_IsMapDataAvailable();
+native bool LGO_IsMapDataAvailable();
 
 /**
  * @brief Get an Int value from the MapInfo keyvalues for the current map with a specific key
@@ -89,7 +89,7 @@ native bool:LGO_IsMapDataAvailable();
  * @param defvalue	Default value to return if key is not found (default 0)
  * @return			Integer value for given key, or defvalue if key is not found
  */
-native LGO_GetMapValueInt(const String:key[], const defvalue=0);
+native void LGO_GetMapValueInt(const char[] key, const int defvalue=0);
 
 /**
  * @brief Get a Float value from the MapInfo keyvalues for the current map with a specific key
@@ -99,7 +99,7 @@ native LGO_GetMapValueInt(const String:key[], const defvalue=0);
  * @param defvalue	Default value to return if key is not found (default 0.0)
  * @return			Float value for given key, or defvalue if key is not found
  */
-native Float:LGO_GetMapValueFloat(const String:key[], const Float:defvalue=0.0);
+native float LGO_GetMapValueFloat(const char[] key, const float defvalue=0.0);
 
 /**
  * @brief Get a Vector from the MapInfo keyvalues for the current map with a specific key
@@ -110,7 +110,7 @@ native Float:LGO_GetMapValueFloat(const String:key[], const Float:defvalue=0.0);
  * @param defvalue	Default value to use if key is not found (default NULL_VECTOR)
  * @noreturn
  */
-native LGO_GetMapValueVector(const String:key[], Float:vector[3], const Float:defvalue[3]=NULL_VECTOR);
+native void LGO_GetMapValueVector(const char[] key, float vector[3], const float defvalue[3]=NULL_VECTOR);
 
 /**
  * @brief Get a String from the MapInfo keyvalues for the current map with a specific key
@@ -122,7 +122,7 @@ native LGO_GetMapValueVector(const String:key[], Float:vector[3], const Float:de
  * @param defvalue	Default value to use if key is not found (default "")
  * @noreturn
  */
-native LGO_GetMapValueString(const String:key[], String:value[], maxlength, const String:defvalue[]="");
+native void LGO_GetMapValueString(const char[] key, char[] value, int maxlength, const char[] defvalue="");
 
 /**
  * @brief Copy a Subsection from the MapInfo keyvalues for the current map
@@ -132,30 +132,28 @@ native LGO_GetMapValueString(const String:key[], String:value[], maxlength, cons
  * @param section	Name of the section to copy
  * @noreturn
  */
-native LGO_CopyMapSubsection(Handle:kv, const String:section[]);
+native void LGO_CopyMapSubsection(Handle kv, const char[] section);
 
-public SharedPlugin:__pl_confogl = 
+public SharedPlugin __pl_confogl =
 {
-	name = "confogl",
-	file = "confoglcompmod.smx",
+    name = "confogl",
+    file = "confoglcompmod.smx",
 #if defined REQUIRE_PLUGIN
-	required = 1,
+    required = 1,
 #else
-	required = 0,
+    required = 0,
 #endif
 };
- 
-public __pl_confogl_SetNTVOptional()
-{
-	MarkNativeAsOptional("LGO_BuildConfigPath");
-	MarkNativeAsOptional("LGO_ExecuteConfigCfg");
-	MarkNativeAsOptional("LGO_IsMapDataAvailable");
-	MarkNativeAsOptional("LGO_GetMapValueInt");
-	MarkNativeAsOptional("LGO_GetMapValueFloat");
-	MarkNativeAsOptional("LGO__GetMapValueVector");
-	MarkNativeAsOptional("LGO_GetMapValueString");
-	MarkNativeAsOptional("LGO_CopyMapSubsection");
-	MarkNativeAsOptional("LGO_IsMatchModeLoaded");
-}
 
-	
+public void __pl_confogl_SetNTVOptional()
+{
+    MarkNativeAsOptional("LGO_BuildConfigPath");
+    MarkNativeAsOptional("LGO_ExecuteConfigCfg");
+    MarkNativeAsOptional("LGO_IsMapDataAvailable");
+    MarkNativeAsOptional("LGO_GetMapValueInt");
+    MarkNativeAsOptional("LGO_GetMapValueFloat");
+    MarkNativeAsOptional("LGO__GetMapValueVector");
+    MarkNativeAsOptional("LGO_GetMapValueString");
+    MarkNativeAsOptional("LGO_CopyMapSubsection");
+    MarkNativeAsOptional("LGO_IsMatchModeLoaded");
+}

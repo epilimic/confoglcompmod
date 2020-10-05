@@ -1,98 +1,99 @@
 #pragma semicolon 1
+#pragma newdecls required
 
 #include <sourcemod>
 #include <sdktools>
 
-new Handle:GW_hGhostWarp;
-new Handle:GW_hGhostWarpReload;
-new bool:GW_bEnabled = true;
-new bool:GW_bReload = false;
-new bool:GW_bDelay[MAXPLAYERS+1];
-new GW_iLastTarget[MAXPLAYERS+1] = -1;
+ConVar          GW_cvGhostWarp;
+ConVar          GW_cvGhostWarpReload;
+bool            GW_bEnabled = true;
+bool            GW_bReload = false;
+bool            GW_bDelay[MAXPLAYERS+1];
+int             GW_iLastTarget[MAXPLAYERS+1] = -1;
 
-GW_OnModuleStart()
+void GW_OnModuleStart()
 {
     // GhostWarp
-    GW_hGhostWarp = CreateConVarEx("ghost_warp", "1", "Sets whether infected ghosts can right click for warp to next survivor");
-    GW_hGhostWarpReload = CreateConVarEx("ghost_warp_reload", "0", "Sets whether to use mouse2 or reload for ghost warp.");
+    GW_cvGhostWarp       = CreateConVarEx("ghost_warp",        "1", "Sets whether infected ghosts can right click for warp to next survivor");
+    GW_cvGhostWarpReload = CreateConVarEx("ghost_warp_reload", "0", "Sets whether to use mouse2 or reload for ghost warp.");
 
     // Ghost Warp
-    HookEvent("player_death",GW_PlayerDeath_Event);
-    HookConVarChange(GW_hGhostWarp,GW_ConVarChange);
-    RegConsoleCmd("sm_warptosurvivor",GW_Cmd_WarpToSurvivor);
+    HookEvent("player_death", GW_PlayerDeath_Event);
+    GW_cvGhostWarp.AddChangeHook(GW_ConVarChange);
+    RegConsoleCmd("sm_warptosurvivor", GW_Cmd_WarpToSurvivor);
 
-    GW_bEnabled = GetConVarBool(GW_hGhostWarp);
-    GW_bReload = GetConVarBool(GW_hGhostWarpReload);
+    GW_bEnabled = GW_cvGhostWarp.BoolValue;
+    GW_bReload = GW_cvGhostWarpReload.BoolValue;
 }
 
-bool:GW_OnPlayerRunCmd(client, buttons)
+bool GW_OnPlayerRunCmd(int client, int buttons)
 {
-    if (! IsPluginEnabled() || ! GW_bEnabled || GW_bDelay[client] || ! IsClientInGame(client) || GetClientTeam(client) != TEAM_INFECTED || GetEntProp(client, Prop_Send, "m_isGhost", 1) != 1) {return false;}
-    if (GW_bReload && !(buttons & IN_RELOAD)) {return false;}
-    if (! GW_bReload && !(buttons & IN_ATTACK2)) {return false;}
+    if (!IsPluginEnabled() || !GW_bEnabled || GW_bDelay[client] || ! IsClientInGame(client) || GetClientTeam(client) != TEAM_INFECTED || GetEntProp(client, Prop_Send, "m_isGhost", 1) != 1) return false;
+    if (GW_bReload && !(buttons & IN_RELOAD))   return false;
+    if (!GW_bReload && !(buttons & IN_ATTACK2)) return false;
 
     GW_bDelay[client] = true;
     CreateTimer(0.25, GW_ResetDelay, client);
 
-    GW_WarpToSurvivor(client,0);
+    GW_WarpToSurvivor(client, 0);
 
     return true;
 }
 
-public GW_PlayerDeath_Event(Handle:event, const String:name[], bool:dB)
+public void GW_PlayerDeath_Event(Event event, const char[] name, bool dB)
 {
-    decl client;
-    client = GetClientOfUserId(GetEventInt(event, "userid"));
+    int client = GetClientOfUserId(event.GetInt("userid"));
     GW_iLastTarget[client] = -1;
 }
 
-public GW_ConVarChange(Handle:convar, const String:oldValue[], const String:newValue[])
+public void GW_ConVarChange(ConVar convar, const char[] oldValue, const char[] newValue)
 {
-    GW_bEnabled = GetConVarBool(GW_hGhostWarp);
+    GW_bEnabled = GW_cvGhostWarp.BoolValue;
 }
 
-public Action:GW_ResetDelay(Handle:timer, any:client)
+public Action GW_ResetDelay(Handle timer, any client)
 {
     GW_bDelay[client] = false;
 }
 
-public Action:GW_Cmd_WarpToSurvivor(client,args)
+public Action GW_Cmd_WarpToSurvivor(int client, int args)
 {
-    if (!IsPluginEnabled() || !GW_bEnabled || args != 1 || !IsClientInGame(client) || GetClientTeam(client) != TEAM_INFECTED || GetEntProp(client,Prop_Send,"m_isGhost",1) != 1){return Plugin_Handled;}
+    if (!IsPluginEnabled() || !GW_bEnabled || args != 1 || !IsClientInGame(client) || GetClientTeam(client) != TEAM_INFECTED || GetEntProp(client,Prop_Send,"m_isGhost",1) != 1) return Plugin_Handled;
 
-    decl String:buffer[2];
+    char buffer[2];
     GetCmdArg(1, buffer, 2);
-    if(strlen(buffer) == 0){return Plugin_Handled;}
-    new character = (StringToInt(buffer));
+    if (strlen(buffer) == 0) return Plugin_Handled;
+    int character = (StringToInt(buffer));
 
-    GW_WarpToSurvivor(client,character);
+    GW_WarpToSurvivor(client, character);
 
     return Plugin_Handled;
 }
  
-GW_WarpToSurvivor(client,character)
+void GW_WarpToSurvivor(int client, int character)
 {
-    decl target;
+    int target;
 
-    if(character <= 0)
+    if (character <= 0)
     {
         target = GW_FindNextSurvivor(client,GW_iLastTarget[client]);
     }
-    else if(character <= 4)
+    else if (character <= 4)
     {
-        target = GetSurvivorIndex(character-1);
+        target = GetSurvivorIndex(character - 1);
     }
     else
     {
         return;
     }
 
-    if(target == 0){return;}
+    if (target == 0) return;
 
     // Prevent people from spawning and then warp to survivor
-    SetEntProp(client,Prop_Send,"m_ghostSpawnState",256);
+    SetEntProp(client, Prop_Send, "m_ghostSpawnState", 256);
 
-    decl Float:position[3], Float:anglestarget[3];
+    float position[3];
+    float anglestarget[3];
 
     GetClientAbsOrigin(target, position);
     GetClientAbsAngles(target, anglestarget);
@@ -101,36 +102,27 @@ GW_WarpToSurvivor(client,character)
     return;
 }
  
-GW_FindNextSurvivor(client,character)
+int GW_FindNextSurvivor(int client, int character)
 {
     if (!IsAnySurvivorsAlive())
     {
         return 0;
     }
 
-    new havelooped = false;
+    int havelooped = false;
     character++;
-    if (character >= NUM_OF_SURVIVORS)
-    {
-        character = 0;
-    }
+    if (character >= NUM_OF_SURVIVORS) character = 0;
 
-    for(new index = character;index<MaxClients;index++)
+    for (int index = character; index < MaxClients; index++)
     {
         if (index >= NUM_OF_SURVIVORS)
         {
-            if (havelooped)
-            {
-                break;
-            }
+            if (havelooped) break;
             havelooped = true;
             index = 0;
         }
        
-        if (GetSurvivorIndex(index) == 0)
-        {
-            continue;
-        }
+        if (GetSurvivorIndex(index) == 0) continue;
        
         GW_iLastTarget[client] = index;
         return GetSurvivorIndex(index);

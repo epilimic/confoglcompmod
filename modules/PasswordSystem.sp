@@ -1,81 +1,83 @@
 #pragma semicolon 1
+#pragma newdecls required
 
 #include <sourcemod>
 #include <sdktools>
 
-new Handle:PS_hPassword;
-new Handle:PS_hReloaded;
-new bool:PS_bIsPassworded = false;
-new bool:PS_bSuppress = false;
-new String:PS_sPassword[128];
+ConVar          PS_cvPassword;
+ConVar          PS_cvReloaded;
+bool            PS_bIsPassworded;
+bool            PS_bSuppress;
+char            PS_sPassword[128];
 
-PS_OnModuleStart()
+void PS_OnModuleStart()
 {
-    PS_hPassword = CreateConVarEx("password", "", "Set a password on the server, if empty password disabled. See Confogl's wiki for more information",FCVAR_DONTRECORD|FCVAR_PROTECTED);
+    PS_cvPassword = CreateConVarEx("password", "", "Set a password on the server, if empty password disabled. See Confogl's wiki for more information", FCVAR_DONTRECORD | FCVAR_PROTECTED);
+    PS_cvPassword.AddChangeHook(PS_ConVarChange);
 
-    HookConVarChange(PS_hPassword,PS_ConVarChange);
     HookEvent("player_disconnect", PS_SuppressDisconnectMsg, EventHookMode_Pre);
 
-    PS_hReloaded = FindConVarEx("password_reloaded");
-    if(PS_hReloaded == INVALID_HANDLE)
+    PS_cvReloaded = FindConVarEx("password_reloaded");
+    if (PS_cvReloaded == INVALID_HANDLE)
     {
-        PS_hReloaded = CreateConVarEx("password_reloaded", "", "DONT TOUCH THIS CVAR! This will is to make sure that the password gets set upon the plugin is reloaded",FCVAR_DONTRECORD|FCVAR_UNLOGGED);
+        PS_cvReloaded = CreateConVarEx("password_reloaded", "", "DONT TOUCH THIS CVAR! This will is to make sure that the password gets set upon the plugin is reloaded", FCVAR_DONTRECORD | FCVAR_UNLOGGED);
     }
     else
     {
-        decl String:sBuffer[128];
-        GetConVarString(PS_hReloaded,sBuffer,sizeof(sBuffer));
+        char sBuffer[128];
+        PS_cvReloaded.GetString(sBuffer, sizeof(sBuffer));
 
-        SetConVarString(PS_hPassword,sBuffer);
-        SetConVarString(PS_hReloaded,"");
+        PS_cvPassword.SetString(sBuffer);
+        PS_cvReloaded.SetString("");
 
-        GetConVarString(PS_hPassword,PS_sPassword,128);
+        PS_cvPassword.GetString(PS_sPassword, sizeof(PS_sPassword));
         PS_bIsPassworded = true;
         PS_SetPasswordOnClients();
     }
 }
 
-PS_OnModuleEnd()
+void PS_OnModuleEnd()
 {
-    if(!PS_bIsPassworded){return;}
-    SetConVarString(PS_hReloaded,PS_sPassword);
+    if (!PS_bIsPassworded) return;
+    PS_cvReloaded.SetString(PS_sPassword);
 }
 
-PS_CheckPassword(client)
+void PS_CheckPassword(int client)
 {
-    if(!PS_bIsPassworded || !IsPluginEnabled()){return;}
-    CreateTimer(0.1,PS_CheckPassword_Timer,client,TIMER_REPEAT);
+    if (!PS_bIsPassworded || !IsPluginEnabled()) return;
+    CreateTimer(0.1, PS_CheckPassword_Timer, client, TIMER_REPEAT);
 }
 
-public Action:PS_CheckPassword_Timer(Handle:timer,any:client)
+public Action PS_CheckPassword_Timer(Handle timer, any client)
 {
-    if(!IsClientConnected(client) || IsFakeClient(client)){return Plugin_Stop;}
-    if(!IsClientInGame(client)){return Plugin_Continue;}
+    if (!IsClientConnected(client) || IsFakeClient(client)) return Plugin_Stop;
+    if (!IsClientInGame(client)) return Plugin_Continue;
     QueryClientConVar(client, "sv_password", PS_ConVarDone);
+
     return Plugin_Stop;
 }
 
-public PS_ConVarDone(QueryCookie:cookie, client, ConVarQueryResult:result, const String:cvarName[], const String:cvarValue[], any:value)
+public void PS_ConVarDone(QueryCookie cookie, int client, ConVarQueryResult result, const char[] cvarName, const char[] cvarValue, any value)
 {
-    if(result == ConVarQuery_Okay)
+    if (result == ConVarQuery_Okay)
     {
-        decl String:buffer[128];
-        GetConVarString(PS_hPassword,buffer,128);
+        char buffer[128];
+        PS_cvPassword.GetString(buffer, sizeof(buffer));
 
-        if(StrEqual(buffer,cvarValue))
+        if (StrEqual(buffer, cvarValue))
         {
             return;
         }
     }
 
     PS_bSuppress = true;
-    KickClient(client,"Bad password");
+    KickClient(client, "Bad password");
 }
 
-public PS_ConVarChange(Handle:convar, const String:oldValue[], const String:newValue[])
+public void PS_ConVarChange(ConVar convar, const char[] oldValue, const char[] newValue)
 {
-    GetConVarString(PS_hPassword,PS_sPassword,128);
-    if(strlen(PS_sPassword) > 0)
+    PS_cvPassword.GetString(PS_sPassword, sizeof(PS_sPassword));
+    if (strlen(PS_sPassword) > 0)
     {
         PS_bIsPassworded = true;
         PS_SetPasswordOnClients();
@@ -86,45 +88,47 @@ public PS_ConVarChange(Handle:convar, const String:oldValue[], const String:newV
     }
 }
 
-public Action:PS_SuppressDisconnectMsg(Handle:event, const String:name[], bool:dontBroadcast)
+public Action PS_SuppressDisconnectMsg(Event event, const char[] name, bool dontBroadcast)
 {
-    if(dontBroadcast || !PS_bSuppress){return Plugin_Continue;}
+    if (dontBroadcast || !PS_bSuppress) return Plugin_Continue;
 
-    decl String:clientName[33], String:networkID[22], String:reason[65];
-    GetEventString(event, "name", clientName, sizeof(clientName));
-    GetEventString(event, "networkid", networkID, sizeof(networkID));
-    GetEventString(event, "reason", reason, sizeof(reason));
+    char clientName[33];
+    char networkID[22];
+    char reason[65];
+    event.GetString("name", clientName, sizeof(clientName));
+    event.GetString("networkid", networkID, sizeof(networkID));
+    event.GetString("reason", reason, sizeof(reason));
 
-    new Handle:newEvent = CreateEvent("player_disconnect", true);
-    SetEventInt(newEvent, "userid", GetEventInt(event, "userid"));
-    SetEventString(newEvent, "reason", reason);
-    SetEventString(newEvent, "name", clientName);
-    SetEventString(newEvent, "networkid", networkID);
-    FireEvent(newEvent, true);
+    Event newEvent = CreateEvent("player_disconnect", true);
+    newEvent.SetInt("userid", event.GetInt("userid"));
+    newEvent.SetString("reason", reason);
+    newEvent.SetString("name", clientName);
+    newEvent.SetString("networkid", networkID);
+    newEvent.Fire(true);
 
     PS_bSuppress = false;
     return Plugin_Handled;
 }
 
-PS_OnMapEnd()
+void PS_OnMapEnd()
 {
     PS_SetPasswordOnClients();
 }
 
-PS_OnClientPutInServer(client)
+void PS_OnClientPutInServer(int client)
 {
     PS_CheckPassword(client);
 }
 
-PS_SetPasswordOnClients()
+void PS_SetPasswordOnClients()
 {
-    decl String:pwbuffer[128];
-    GetConVarString(PS_hPassword,pwbuffer,128);
+    char pwbuffer[128];
+    PS_cvPassword.GetString(pwbuffer, sizeof(pwbuffer));
 
-    for(new client = 1;client<MaxClients;client++)
+    for (int client = 1; client < MaxClients; client++)
     {
-        if(!IsClientInGame(client) || IsFakeClient(client)){continue;}
-        LogMessage("Set password on %N, password %s",client,pwbuffer);
-        ClientCommand(client,"sv_password \"%s\"",pwbuffer);
+        if (!IsClientInGame(client) || IsFakeClient(client)) continue;
+        Debug_LogMessage("Set password on %N, password %s", client, pwbuffer);
+        ClientCommand(client, "sv_password \"%s\"", pwbuffer);
     }
 }

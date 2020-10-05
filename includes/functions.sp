@@ -1,111 +1,100 @@
 #pragma semicolon 1
+#pragma newdecls required
+
 #include <sourcemod>
 
 #define CVAR_PREFIX         "confogl_"
 #define CVAR_FLAGS          FCVAR_NONE
-#define CVAR_PRIVATE        (FCVAR_DONTRECORD|FCVAR_PROTECTED)
+#define CVAR_PRIVATE        (FCVAR_DONTRECORD | FCVAR_PROTECTED)
 
-Handle:CreateConVarEx(const String:name[], const String:defaultValue[], const String:description[]="", flags=0, bool:hasMin=false, Float:min=0.0, bool:hasMax=false, Float:max=0.0)
+ConVar CreateConVarEx(const char[] name, const char[] defaultValue, const char[] description = "", int flags = 0, bool hasMin = false, float min = 0.0, bool hasMax = false, float max = 0.0)
 {
-    decl String:sBuffer[128], Handle:cvar;
-    Format(sBuffer,sizeof(sBuffer),"%s%s",CVAR_PREFIX,name);
+    char sBuffer[128];
+    ConVar cvar;
+    Format(sBuffer,sizeof(sBuffer),"%s%s", CVAR_PREFIX, name);
     flags = flags | CVAR_FLAGS;
-    cvar = CreateConVar(sBuffer,defaultValue,description,flags,hasMin,min,hasMax,max);
+    cvar = CreateConVar(sBuffer, defaultValue, description, flags, hasMin, min, hasMax, max);
 
     return cvar;
 }
 
-Handle:FindConVarEx(const String:name[])
+ConVar FindConVarEx(const char[] name)
 {
-    decl String:sBuffer[128];
-    Format(sBuffer,sizeof(sBuffer),"%s%s",CVAR_PREFIX,name);
+    char sBuffer[128];
+    Format(sBuffer, sizeof(sBuffer), "%s%s", CVAR_PREFIX, name);
     return FindConVar(sBuffer);
 }
 
-new bool:bIsPluginEnabled = false;
+bool bIsPluginEnabled = false;
 
-bool:IsHumansOnServer()
+bool IsHumansOnServer()
 {
-    for(new i=1;i<=MaxClients;i++)
+    for (int i = 1; i <= MaxClients; i++)
     {
-        if(IsClientConnected(i) && !IsFakeClient(i))
-        {
-            return true;
-        }
+        if (IsClientConnected(i) && !IsFakeClient(i)) return true;
     }
     return false;
 }
 
-bool:IsVersus()
+bool IsVersus()
 {
-    decl String:GameMode[32];
-    GetConVarString(FindConVar("mp_gamemode"), GameMode, sizeof(GameMode));
-    if(StrContains(GameMode, "versus", false) != -1)
-    {
-        return true;
-    }
-    return false;
+    char GameMode[32];
+    FindConVar("mp_gamemode").GetString(GameMode, sizeof(GameMode));
+    return StrContains(GameMode, "versus", false) != -1;
 }
 
-bool:IsScavenge()
+bool IsScavenge()
 {
-    decl String:GameMode[32];
-    GetConVarString(FindConVar("mp_gamemode"), GameMode, sizeof(GameMode));
-    if(StrContains(GameMode, "scavenge", false) != -1)
-    {
-        return true;
-    }
-    return false;
+    char GameMode[32];
+    FindConVar("mp_gamemode").GetString(GameMode, sizeof(GameMode));
+    return StrContains(GameMode, "scavenge", false) != -1;
 }
 
-bool:IsPluginEnabled(bool:bSetStatus=false,bool:bStatus=false)
+bool IsPluginEnabled(bool bSetStatus = false, bool bStatus = false)
 {
-    if(bSetStatus)
-    {
-        bIsPluginEnabled = bStatus;
-    }
+    if (bSetStatus) bIsPluginEnabled = bStatus;
     return bIsPluginEnabled;
 }
 
-stock GetSurvivorPermanentHealth(client)
+stock int GetSurvivorPermanentHealth(int client)
 {
     return GetEntProp(client, Prop_Send, "m_iHealth");
 }
 
-stock GetSurvivorTempHealth(client)
+stock int GetSurvivorTempHealth(int client)
 {
-    new temphp = RoundToCeil(GetEntPropFloat(client, Prop_Send, "m_healthBuffer") - ((GetGameTime() - GetEntPropFloat(client, Prop_Send, "m_healthBufferTime")) * GetConVarFloat(FindConVar("pain_pills_decay_rate")))) - 1;
+    int temphp = RoundToCeil(GetEntPropFloat(client, Prop_Send, "m_healthBuffer") - ((GetGameTime() - GetEntPropFloat(client, Prop_Send, "m_healthBufferTime")) * GetConVarFloat(FindConVar("pain_pills_decay_rate")))) - 1;
     return temphp > 0 ? temphp : 0;
 }
 
-stock GetSurvivorIncapCount(client)
+stock int GetSurvivorIncapCount(int client)
 {
     return GetEntProp(client, Prop_Send, "m_currentReviveCount");
 }
 
-stock bool:IsSurvivor(client)
+stock bool IsSurvivor(int client)
 {
     return IsClientInGame(client) && GetClientTeam(client) == 2;
 }
 
-stock ZeroVector(Float:vector[3])
+stock void ZeroVector(float vector[3])
 {
-    vector=NULL_VECTOR;
+    vector = NULL_VECTOR;
 }
 
-stock AddToVector(Float:to[3], Float:from[3])
+stock void AddToVector(float to[3], float from[3])
 {
-    to[0]+=from[0];
-    to[1]+=from[1];
-    to[2]+=from[2];
+    to[0] += from[0];
+    to[1] += from[1];
+    to[2] += from[2];
 }
 
-stock CopyVector(Float:to[3], Float:from[3])
+stock void CopyVector(float to[3], float from[3])
 {
-    to=from;
+    to = from;
 }
 
-stock GetURandomIntRange(min, max) { return RoundToNearest((GetURandomFloat() * (max-min))+min); }
+stock int GetURandomIntRange(int min, int max) { return RoundToNearest((GetURandomFloat() * (max-min)) + min); }
 
 /**
  * Finds the first occurrence of a pattern in another string.
@@ -118,15 +107,16 @@ stock GetURandomIntRange(min, max) { return RoundToNearest((GetURandomFloat() * 
  *                      occurrence of the pattern in the string, or -1 if the
  *                      character was not found.
  */
-stock FindPatternInString(const String:str[], const String:pattern[], bool:reverse = false)
+stock int FindPatternInString(const char[] str, const char[] pattern, bool reverse = false)
 {
-    new i, c, len;
+    int i, c, len;
 
     len = strlen(pattern);
     c = pattern[0];
-    while(i < len && (i = FindCharInString(str[i], c, reverse)) != -1)
-        if(strncmp(str[i], pattern, len))
-            return i;
+    while (i < len && (i = FindCharInString(str[i], c, reverse)) != -1)
+    {
+        if (strncmp(str[i], pattern, len)) return i;
+    }
     return -1;
 }
 
@@ -140,14 +130,16 @@ stock FindPatternInString(const String:str[], const String:pattern[], bool:rever
  *                      occurences.
  * @return              The number of occurences of the pattern in the string
  */
-stock CountPatternsInString(const String:str[], const String:pattern[], bool:overlap=false)
+stock int CountPatternsInString(const char[] str, const char[] pattern, bool overlap = false)
 {
-    new off, i, delta, cnt, len = strlen(str);
+    int off, i, delta, cnt;
+    int len = strlen(str);
+
     delta = overlap ? strlen(pattern) : 1;
-    while(i < len && (off = FindPatternInString(str[i], pattern)) != -1)
+    while (i < len && (off = FindPatternInString(str[i], pattern)) != -1)
     {
         cnt++;
-        i+=off+delta;
+        i += off + delta;
     }
     return cnt;
 }
@@ -159,14 +151,15 @@ stock CountPatternsInString(const String:str[], const String:pattern[], bool:ove
  * @param c             Character to search for.
  * @return              The number of occurences of the pattern in the string
  */
-stock CountCharsInString(const String:str[], c)
+stock int CountCharsInString(const char[] str, char c)
 {
-    new off, i, cnt, len = strlen(str);
+    int off, i, cnt;
+    int len = strlen(str);
 
-    while(i < len && (off = FindCharInString(str[i], c)) != -1)
+    while (i < len && (off = FindCharInString(str[i], c)) != -1)
     {
         cnt++;
-        i+=off+1;
+        i += off + 1;
     }
     return cnt;
 }

@@ -1,94 +1,94 @@
 #pragma semicolon 1
+#pragma newdecls required
 
 #include <sourcemod>
 #include <sdktools>
 #include <left4dhooks>
 
-#define DEBUG_MI                    0
+#define DEBUG_MI        0
 
-new Handle:kMIData = INVALID_HANDLE;
+KeyValues       kMIData;
 
-static bool:MapDataAvailable;
-static Float:Start_Point[3];
-static Float:End_Point[3];
-static Float:Start_Dist;
-static Float:Start_Extra_Dist;
-static Float:End_Dist;
+static bool     MapDataAvailable;
+static float    Start_Point[3];
+static float    End_Point[3];
+static float    Start_Dist;
+static float    Start_Extra_Dist;
+static float    End_Dist;
 
-static iMapMaxDistance;
-static iIsInEditMode[MAXPLAYERS];
-static Float:fLocTemp[MAXPLAYERS][3];
+static int      iMapMaxDistance;
+static int      iIsInEditMode[MAXPLAYERS];
+static float    fLocTemp[MAXPLAYERS][3];
 
-public MI_OnModuleStart()
+void MI_OnModuleStart()
 {
     MI_KV_Load();
 
-    // RegAdminCmd("confogl_midata_reload", MI_KV_CmdReload, ADMFLAG_CONFIG);
-    RegAdminCmd("confogl_midata_save", MI_KV_CmdSave, ADMFLAG_CONFIG);
+    RegAdminCmd("confogl_midata_save",   MI_KV_CmdSave,    ADMFLAG_CONFIG);
     RegAdminCmd("confogl_save_location", MI_KV_CmdSaveLoc, ADMFLAG_CONFIG);
 
     HookEvent("player_disconnect", PlayerDisconnect_Event);
 }
 
-MI_APL()
+void MI_APL()
 {
     CreateNative("LGO_IsMapDataAvailable", _native_IsMapDataAvailable);
-    CreateNative("LGO_GetMapValueInt", _native_GetMapValueInt);
-    CreateNative("LGO_GetMapValueFloat", _native_GetMapValueFloat);
-    CreateNative("LGO_GetMapValueVector", _native_GetMapValueVector);
-    CreateNative("LGO_GetMapValueString", _native_GetMapValueString);
-    CreateNative("LGO_CopyMapSubsection", _native_CopyMapSubsection);
+    CreateNative("LGO_GetMapValueInt",     _native_GetMapValueInt);
+    CreateNative("LGO_GetMapValueFloat",   _native_GetMapValueFloat);
+    CreateNative("LGO_GetMapValueVector",  _native_GetMapValueVector);
+    CreateNative("LGO_GetMapValueString",  _native_GetMapValueString);
+    CreateNative("LGO_CopyMapSubsection",  _native_CopyMapSubsection);
 }
 
-public MI_OnMapStart()
+void MI_OnMapStart()
 {
     MI_KV_UpdateMapInfo();
 }
 
-public MI_OnMapEnd()
+void MI_OnMapEnd()
 {
-    KvRewind(kMIData);
+    kMIData.Rewind();
     MapDataAvailable = false;
-    for (new i; i < MAXPLAYERS; i++) iIsInEditMode[i] = 0;
+    for (int i; i < MAXPLAYERS; i++) iIsInEditMode[i] = 0;
 }
 
-public MI_OnModuleEnd()
+public void MI_OnModuleEnd()
 {
     MI_KV_Close();
 }
 
-public PlayerDisconnect_Event(Handle:event, const String:name[], bool:dontBroadcast)
+public void PlayerDisconnect_Event(Event event, const char[] name, bool dontBroadcast)
 {
-    new client = GetClientOfUserId(GetEventInt(event, "userid"));
+    int client = GetClientOfUserId(event.GetInt("userid"));
     if (client > -1 && client < MAXPLAYERS) iIsInEditMode[client] = 0;
 }
 
-public Action:MI_KV_CmdSave(client, args)
+public Action MI_KV_CmdSave(int client, int args)
 {
-    decl String:sCurMap[128];
+    char sCurMap[128];
     GetCurrentMap(sCurMap, sizeof(sCurMap));
 
-    if (KvJumpToKey(kMIData, sCurMap, true))
+    if (kMIData.JumpToKey(sCurMap, true))
     {
-        KvSetVector(kMIData, "start_point", Start_Point);
-        KvSetFloat(kMIData, "start_dist", Start_Dist);
-        KvSetFloat(kMIData, "start_extra_dist", Start_Extra_Dist);
+        kMIData.SetVector("start_point", Start_Point);
+        kMIData.SetFloat("start_dist", Start_Dist);
+        kMIData.SetFloat("start_extra_dist", Start_Extra_Dist);
 
-        decl String:sNameBuff[PLATFORM_MAX_PATH];
+        char sNameBuff[PLATFORM_MAX_PATH];
         BuildConfigPath(sNameBuff, sizeof(sNameBuff), "mapinfo.txt");
 
-        KvRewind(kMIData);
+        kMIData.Rewind();
 
-        KeyValuesToFile(kMIData, sNameBuff);
+        kMIData.ExportToFile(sNameBuff);
 
         ReplyToCommand(client, "%s has been added to %s.", sCurMap, sNameBuff);
     }
 }
 
-public Action:MI_KV_CmdSaveLoc(client, args)
+public Action MI_KV_CmdSaveLoc(int client, int args)
 {
-    new bool:updateinfo;
-    decl String:sCurMap[128];
+    bool updateinfo;
+    char sCurMap[128];
     GetCurrentMap(sCurMap, sizeof(sCurMap));
 
     if (!iIsInEditMode[client])
@@ -99,7 +99,7 @@ public Action:MI_KV_CmdSaveLoc(client, args)
             return Plugin_Handled;
         }
 
-        decl String:sBuffer[16];
+        char sBuffer[16];
         GetCmdArg(1, sBuffer, sizeof(sBuffer));
 
         if (StrEqual(sBuffer, "start_point", true))
@@ -118,20 +118,21 @@ public Action:MI_KV_CmdSaveLoc(client, args)
             return Plugin_Handled;
         }
 
-        if (KvJumpToKey(kMIData, sCurMap, true))
+        if (kMIData.JumpToKey(sCurMap, true))
         {
             GetClientAbsOrigin(client, fLocTemp[client]);
-            KvSetVector(kMIData, sBuffer, fLocTemp[client]);
+            kMIData.SetVector(sBuffer, fLocTemp[client]);
         }
         updateinfo = true;
     }
     else if (iIsInEditMode[client] == 1)
     {
         iIsInEditMode[client] = 3;
-        decl Float:fDistLoc[3], Float:fDistance;
+        float fDistLoc[3];
+        float fDistance;
         GetClientAbsOrigin(client, fDistLoc);
         fDistance = GetVectorDistance(fDistLoc, fLocTemp[client]);
-        if (KvJumpToKey(kMIData, sCurMap, true)) KvSetFloat(kMIData, "start_dist", fDistance);
+        if (kMIData.JumpToKey(sCurMap, true)) kMIData.SetFloat("start_dist", fDistance);
 
         ReplyToCommand(client, "Move to the farthest point in the saferoom and enter this command again to set start_extra_dist for this point");
 
@@ -140,31 +141,33 @@ public Action:MI_KV_CmdSaveLoc(client, args)
     else if (iIsInEditMode[client] == 2)
     {
         iIsInEditMode[client] = 0;
-        decl Float:fDistLoc[3], Float:fDistance;
+        float fDistLoc[3];
+        float fDistance;
         GetClientAbsOrigin(client, fDistLoc);
         fDistance = GetVectorDistance(fDistLoc, fLocTemp[client]);
-        if (KvJumpToKey(kMIData, sCurMap, true)) KvSetFloat(kMIData, "end_dist", fDistance);
+        if (kMIData.JumpToKey(sCurMap, true)) kMIData.SetFloat("end_dist", fDistance);
 
         updateinfo = true;
     }
     else if (iIsInEditMode[client] == 3)
     {
         iIsInEditMode[client] = 0;
-        decl Float:fDistLoc[3], Float:fDistance;
+        float fDistLoc[3];
+        float fDistance;
         GetClientAbsOrigin(client, fDistLoc);
         fDistance = GetVectorDistance(fDistLoc, fLocTemp[client]);
-        if (KvJumpToKey(kMIData, sCurMap, true)) KvSetFloat(kMIData, "start_extra_dist", fDistance);
+        if (kMIData.JumpToKey(sCurMap, true)) kMIData.SetFloat("start_extra_dist", fDistance);
 
         updateinfo = true;
     }
 
     if (updateinfo)
     {
-        decl String:sNameBuff[PLATFORM_MAX_PATH];
+        char sNameBuff[PLATFORM_MAX_PATH];
         BuildConfigPath(sNameBuff, sizeof(sNameBuff), "mapinfo.txt");
 
-        KvRewind(kMIData);
-        KeyValuesToFile(kMIData, sNameBuff);
+        kMIData.Rewind();
+        kMIData.ExportToFile(sNameBuff);
 
         ReplyToCommand(client, "mapinfo.txt has been updated!");
     }
@@ -172,52 +175,51 @@ public Action:MI_KV_CmdSaveLoc(client, args)
     return Plugin_Handled;
 }
 
-MI_KV_Close()
+void MI_KV_Close()
 {
-    if(kMIData == INVALID_HANDLE) return;
-    CloseHandle(kMIData);
-    kMIData = INVALID_HANDLE;
+    if (kMIData == INVALID_HANDLE) return;
+    delete kMIData;
 }
 
-MI_KV_Load()
+void MI_KV_Load()
 {
-    decl String:sNameBuff[PLATFORM_MAX_PATH];
+    char sNameBuff[PLATFORM_MAX_PATH];
 
-    if(DEBUG_MI || IsDebugEnabled())
-        LogMessage("[MI] Loading MapInfo KeyValues");
+    // TODO improve debugging methods
+    if (DEBUG_MI || IsDebugEnabled())
+        Debug_LogMessage("[MI] Loading MapInfo KeyValues");
 
-    kMIData = CreateKeyValues("MapInfo");
-    BuildConfigPath(sNameBuff, sizeof(sNameBuff), "mapinfo.txt"); //Build our filepath
-    if (!FileToKeyValues(kMIData, sNameBuff))
+    kMIData = new KeyValues("MapInfo");
+    BuildConfigPath(sNameBuff, sizeof(sNameBuff), "mapinfo.txt"); // Build our filepath
+    if (!kMIData.ImportFromFile(sNameBuff))
     {
-        LogError("[MI] Couldn't load MapInfo data!");
+        LogError("[MI] Couldn't load MapInfo data from path %s", sNameBuff);
         MI_KV_Close();
         return;
     }
 }
 
-MI_KV_UpdateMapInfo()
+void MI_KV_UpdateMapInfo()
 {
-    decl String:sCurMap[128];
+    char sCurMap[128];
     GetCurrentMap(sCurMap, sizeof(sCurMap));
 
-    if (KvJumpToKey(kMIData, sCurMap))
+    if (kMIData.JumpToKey(sCurMap))
     {
-        KvGetVector(kMIData, "start_point", Start_Point);
-        KvGetVector(kMIData, "end_point", End_Point);
-        Start_Dist = KvGetFloat(kMIData, "start_dist");
-        Start_Extra_Dist = KvGetFloat(kMIData, "start_extra_dist");
-        End_Dist = KvGetFloat(kMIData, "end_dist");
-        iMapMaxDistance = KvGetNum(kMIData, "max_distance", -1);
+        kMIData.GetVector("start_point", Start_Point);
+        kMIData.GetVector("end_point", End_Point);
+        Start_Dist = kMIData.GetFloat("start_dist");
+        Start_Extra_Dist = kMIData.GetFloat("start_extra_dist");
+        End_Dist = kMIData.GetFloat("end_dist");
+        iMapMaxDistance = kMIData.GetNum("max_distance", -1);
 
-        // KvRewind(kMIData);
         MapDataAvailable = true;
     }
     else
     {
         MapDataAvailable = false;
         Start_Dist = FindStartPointHeuristic(Start_Point);
-        if(Start_Dist > 0.0)
+        if (Start_Dist > 0.0)
         {
             // This is the largest Start Extra Dist we've encountered;
             // May be too much
@@ -235,84 +237,98 @@ MI_KV_UpdateMapInfo()
         iMapMaxDistance = -1;
         LogMessage("[MI] MapInfo for %s is missing.", sCurMap);
     }
-
-    // Let's leave MIData on the current map
-    //KvRewind(kMIData);
 }
 
-static stock Float:FindStartPointHeuristic(Float:result[3])
+static stock float FindStartPointHeuristic(float result[3])
 {
-    new kits;
-    new Float:kitOrigin[4][3];
-    new Float:averageOrigin[3];
-    new entcount = GetEntityCount();
-    decl String:entclass[128];
-    for(new iEntity = 1;iEntity<=entcount && kits <4;iEntity++)
+    int kits;
+    float kitOrigin[4][3];
+    float averageOrigin[3];
+    int entcount = GetEntityCount();
+    char entclass[128];
+    for (int iEntity = 1; iEntity <= entcount && kits < 4; iEntity++)
     {
-        if(!IsValidEdict(iEntity) || !IsValidEntity(iEntity)){continue;}
-        GetEdictClassname(iEntity,entclass,sizeof(entclass));
-        if(StrEqual(entclass, "weapon_first_aid_kit_spawn"))
+        if (!IsValidEdict(iEntity) || !IsValidEntity(iEntity)) continue;
+        GetEdictClassname(iEntity, entclass, sizeof(entclass));
+        if (StrEqual(entclass, "weapon_first_aid_kit_spawn"))
         {
             GetEntPropVector(iEntity, Prop_Send, "m_vecOrigin", kitOrigin[kits]);
             AddToVector(averageOrigin, kitOrigin[kits]);
             kits++;
         }
     }
-    if(kits < 4) return -1.0;
+    if (kits < 4) return -1.0;
     ScaleVector(averageOrigin, 0.25);
 
-    new Float:greatestDist, Float:tempDist;
-    for(new i; i < 4; i++)
+    float greatestDist;
+    float tempDist;
+
+    for (int i = 0; i < 4; i++)
     {
         tempDist = GetVectorDistance(averageOrigin, kitOrigin[i]);
         if (tempDist > greatestDist) greatestDist = tempDist;
     }
     CopyVector(result, averageOrigin);
-    return greatestDist+1.0;
+    return greatestDist + 1.0;
 }
 
 // Old Functions (Avoid using these, use the ones below)
-stock Float:GetMapStartOriginX()
+stock float GetMapStartOriginX()
 {
     return Start_Point[0];
 }
 
-stock Float:GetMapStartOriginY()
+stock float GetMapStartOriginY()
 {
     return Start_Point[1];
 }
 
-stock Float:GetMapStartOriginZ()
+stock float GetMapStartOriginZ()
 {
     return Start_Point[2];
 }
 
-stock Float:GetMapEndOriginX()
+stock float GetMapEndOriginX()
 {
     return End_Point[0];
 }
 
-stock Float:GetMapEndOriginY()
+stock float GetMapEndOriginY()
 {
     return End_Point[1];
 }
 
-stock Float:GetMapEndOriginZ()
+stock float GetMapEndOriginZ()
 {
     return End_Point[2];
 }
 
 // New Super Awesome Functions!!!
 
-stock bool:IsMapFinale() return L4D_IsMissionFinalMap();
+stock bool IsMapFinale()
+{
+    return L4D_IsMissionFinalMap();
+}
 
-stock GetCustomMapMaxScore() return iMapMaxDistance;
+stock int GetCustomMapMaxScore()
+{
+    return iMapMaxDistance;
+}
 
-stock GetMapMaxScore() return L4D_GetVersusMaxCompletionScore();
+stock int GetMapMaxScore()
+{
+    return L4D_GetVersusMaxCompletionScore();
+}
 
-stock SetMapMaxScore(score) L4D_SetVersusMaxCompletionScore(score);
+stock void SetMapMaxScore(int score)
+{
+    L4D_SetVersusMaxCompletionScore(score);
+}
 
-stock bool:IsMapDataAvailable() return MapDataAvailable;
+stock bool IsMapDataAvailable()
+{
+    return MapDataAvailable;
+}
 
 
 /**
@@ -324,84 +340,82 @@ stock bool:IsMapDataAvailable() return MapDataAvailable;
  *                      False if it is not in the specified saferoom(s)
  *                      False if no saferoom specified
  */
-stock bool:IsEntityInSaferoom(ent, saferoom = 3)
+stock bool IsEntityInSaferoom(int ent, int saferoom = 3)
 {
-    decl Float:origins[3];
+    float origins[3];
     GetEntPropVector(ent, Prop_Send, "m_vecOrigin", origins);
 
     if ((saferoom & START_SAFEROOM) && (GetVectorDistance(origins, Start_Point) <= (Start_Extra_Dist > Start_Dist ? Start_Extra_Dist : Start_Dist))) return true;
     else if ((saferoom & END_SAFEROOM) && (GetVectorDistance(origins, End_Point) <= End_Dist)) return true;
     else return false;
-//  return ((GetVectorDistance(origins, Start_Point) <= (Start_Extra_Dist > Start_Dist ? Start_Extra_Dist : Start_Dist))
-//      || (GetVectorDistance(origins, End_Point) <= End_Dist));
 }
 
-stock GetMapValueInt(const String:key[], defvalue=0) 
+stock int GetMapValueInt(const char[] key, int defvalue = 0)
 {
-    return KvGetNum(kMIData, key, defvalue);
+    return kMIData.GetNum(key, defvalue);
 }
-stock Float:GetMapValueFloat(const String:key[], Float:defvalue=0.0) 
+stock float GetMapValueFloat(const char[] key, float defvalue = 0.0)
 {
-    return KvGetFloat(kMIData, key, defvalue);
+    return kMIData.GetFloat(key, defvalue);
 }
-stock GetMapValueVector(const String:key[], Float:vector[3], Float:defvalue[3]=NULL_VECTOR) 
+stock void GetMapValueVector(const char[] key, float vector[3], float defvalue[3] = NULL_VECTOR)
 {
-    KvGetVector(kMIData, key, vector, defvalue);
+    kMIData.GetVector(key, vector, defvalue);
 }
-stock GetMapValueString(const String:key[], String:value[], maxlength, const String:defvalue[])
+stock void GetMapValueString(const char[] key, char[] value, int maxlength, const char[] defvalue)
 {
-    KvGetString(kMIData, key, value, maxlength, defvalue);
+    kMIData.GetString(key, value, maxlength, defvalue);
 }
 
-stock CopyMapSubsection(Handle:kv, const String:section[])
+stock void CopyMapSubsection(KeyValues kv, const char[] section)
 {
-    if(KvJumpToKey(kMIData, section, false))
+    if (kMIData.JumpToKey(section, false))
     {
         KvCopySubkeys(kMIData, kv);
-        KvGoBack(kMIData);
+        kMIData.GoBack();
     }
 }
 
-stock GetMapStartOrigin(Float:origin[3])
+stock void GetMapStartOrigin(float origin[3])
 {
     origin[0] = Start_Point[0];
     origin[1] = Start_Point[1];
     origin[2] = Start_Point[2];
 }
 
-stock GetMapEndOrigin(Float:origin[3])
+stock void GetMapEndOrigin(float origin[3])
 {
     origin[0] = End_Point[0];
     origin[1] = End_Point[1];
     origin[2] = End_Point[2];
 }
 
-stock Float:GetMapEndDist()
+stock float GetMapEndDist()
 {
     return End_Dist;
 }
 
-stock Float:GetMapStartDist()
+stock float GetMapStartDist()
 {
     return Start_Dist;
 }
 
-stock Float:GetMapStartExtraDist()
+stock float GetMapStartExtraDist()
 {
     return Start_Extra_Dist;
 }
 
-public _native_IsMapDataAvailable(Handle:plugin, numParams)
+public int _native_IsMapDataAvailable(Handle plugin, int numParams)
 {
     return IsMapDataAvailable();
 }
 
-public _native_GetMapValueInt(Handle:plugin, numParams)
+public int _native_GetMapValueInt(Handle plugin, int numParams)
 {
-    decl len, defval;
+    int len, defval;
 
     GetNativeStringLength(1, len);
-    new String:key[len+1];
+    char[] key = new char[len+1];
     GetNativeString(1, key, len+1);
 
     defval = GetNativeCellRef(2);
@@ -409,25 +423,28 @@ public _native_GetMapValueInt(Handle:plugin, numParams)
     return GetMapValueInt(key, defval);
 }
 
-public _native_GetMapValueFloat(Handle:plugin, numParams)
+public int _native_GetMapValueFloat(Handle plugin, int numParams)
 {
-    decl len, Float:defval;
+    int len;
+    float defval;
 
     GetNativeStringLength(1, len);
-    new String:key[len+1];
+    char[] key = new char[len+1];
     GetNativeString(1, key, len+1);
 
     defval = GetNativeCellRef(2);
 
-    return _:GetMapValueFloat(key, defval);
+    return view_as<int>(GetMapValueFloat(key, defval));
 }
 
-public _native_GetMapValueVector(Handle:plugin, numParams)
+public int _native_GetMapValueVector(Handle plugin, int numParams)
 {
-    decl len, Float:defval[3], Float:value[3];
+    int len;
+    float defval[3];
+    float value[3];
 
     GetNativeStringLength(1, len);
-    new String:key[len+1];
+    char[] key = new char[len+1];
     GetNativeString(1, key, len+1);
 
     GetNativeArray(3, defval, 3);
@@ -437,30 +454,32 @@ public _native_GetMapValueVector(Handle:plugin, numParams)
     SetNativeArray(2, value, 3);
 }
 
-public _native_GetMapValueString(Handle:plugin, numParams)
+public int _native_GetMapValueString(Handle plugin, int numParams)
 {
-    decl len;
+    int len;
     GetNativeStringLength(1, len);
-    new String:key[len+1];
+    char[] key = new char[len+1];
     GetNativeString(1, key, len+1);
 
     GetNativeStringLength(4, len);
-    new String:defval[len+1];
+    char[] defval = new char[len+1];
     GetNativeString(4, defval, len+1);
 
     len = GetNativeCell(3);
-    new String:buf[len+1];
+    char[] buf = new char[len+1];
 
     GetMapValueString(key, buf, len, defval);
 
     SetNativeString(2, buf, len);
 }
 
-public _native_CopyMapSubsection(Handle:plugin, numParams)
+public int _native_CopyMapSubsection(Handle plugin, int numParams)
 {
-    decl len, Handle:kv;
+    int len;
+    KeyValues kv;
+
     GetNativeStringLength(2, len);
-    new String:key[len+1];
+    char[] key = new char[len+1];
     GetNativeString(2, key, len+1);
 
     kv = GetNativeCell(1);

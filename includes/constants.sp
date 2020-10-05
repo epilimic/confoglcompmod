@@ -1,8 +1,13 @@
 #pragma semicolon 1
+#pragma newdecls required
 
-const   START_SAFEROOM          = 1 << 0;
-const   END_SAFEROOM            = 1 << 1;
+const int START_SAFEROOM    = 1 << 0;
+const int END_SAFEROOM      = 1 << 1;
+const int TEAM_SURVIVOR     = 2;
+const int TEAM_INFECTED     = 3;
+const int NUM_OF_SURVIVORS  = 4;
 
+char g_sTeamName[8][]       = { "Spectator", "" , "Survivor", "Infected", "", "Infected", "Survivors", "Infected" };
 
 enum WeaponIDs
 {
@@ -42,8 +47,3 @@ enum WeaponIDs
     WEPID_SNIPER_SCOUT,     // 36
     WEPID_RIFLE_M60         // 37
 };
-
-new String:g_sTeamName[8][]                = { "Spectator", "" , "Survivor", "Infected", "", "Infected", "Survivors", "Infected" };
-const   NUM_OF_SURVIVORS    = 4;
-const   TEAM_SURVIVOR       = 2;
-const   TEAM_INFECTED       = 3;

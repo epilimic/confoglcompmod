@@ -1,29 +1,28 @@
 #pragma semicolon 1
+#pragma newdecls required
 
 #include <sourcemod>
 #include <sdktools>
 #include <left4dhooks>
 
-new Handle:UL_hEnable;
-// native L4D_LobbyUnreserve();
+ConVar UL_cvEnable;
 
-UL_OnModuleStart()
+void UL_OnModuleStart()
 {
-    UL_hEnable  = CreateConVarEx("match_killlobbyres", "1", "Sets whether the plugin will clear lobby reservation once a match have begun");
+    UL_cvEnable  = CreateConVarEx("match_killlobbyres", "1", "Sets whether the plugin will clear lobby reservation once a match have begun");
     RegAdminCmd("sm_killlobbyres", UL_KillLobbyRes, ADMFLAG_BAN, "Forces the plugin to kill lobby reservation");
-    // MarkNativeAsOptional("L4D_LobbyUnreserve");
 }
 
-bool:UL_CheckVersion()
+bool UL_CheckVersion()
 {
     return FindConVar("left4dhooks_version") == INVALID_HANDLE;
 }
 
-UL_OnClientPutInServer()
+void UL_OnClientPutInServer()
 {
-    if(!IsPluginEnabled() || !GetConVarBool(UL_hEnable)){return;}
+    if (!IsPluginEnabled() || !UL_cvEnable.BoolValue) return;
 
-    if(UL_CheckVersion())
+    if (UL_CheckVersion())
     {
         LogError("Failed to unreserve lobby. Left4Dhooks is outdated!");
         return;
@@ -32,9 +31,9 @@ UL_OnClientPutInServer()
     L4D_LobbyUnreserve();
 }
 
-public Action:UL_KillLobbyRes(client,args)
+public Action UL_KillLobbyRes(int client, int args)
 {
-    if(UL_CheckVersion())
+    if (UL_CheckVersion())
     {
         LogError("Failed to unreserve lobby. Left4Dhooks is outdated!");
         return;

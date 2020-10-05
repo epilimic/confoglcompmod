@@ -1,52 +1,50 @@
 #pragma semicolon 1
+#pragma newdecls required
 
 #include <sourcemod>
 #include <sdktools>
 #include <sdkhooks>
 
-#define STATE_SPAWNREADY 0
-#define STATE_TOOCLOSE 256
-#define SPAWN_RANGE 150
+#define STATE_SPAWNREADY            0
+#define STATE_TOOCLOSE              256
+#define SPAWN_RANGE                 150
 
-new Handle:FS_hEnabled;
+ConVar              FS_hEnabled;
+bool                FS_bIsFinale;
+bool                FS_bEnabled     = true;
 
-new bool:FS_bIsFinale;
-new bool:FS_bEnabled = true;
-
-public FS_OnModuleStart()
+void FS_OnModuleStart()
 {
     FS_hEnabled = CreateConVarEx("reduce_finalespawnrange", "1", "Adjust the spawn range on finales for infected, to normal spawning range");
+    FS_bEnabled = FS_hEnabled.BoolValue;
+    FS_hEnabled.AddChangeHook(FS_ConVarChange);
 
-    HookConVarChange(FS_hEnabled, FS_ConVarChange);
-
-    FS_bEnabled = GetConVarBool(FS_hEnabled);
-
-    HookEvent("round_end", FS_Round_Event, EventHookMode_PostNoCopy);
-    HookEvent("round_start", FS_Round_Event, EventHookMode_PostNoCopy);
+    HookEvent("round_end",    FS_Round_Event,       EventHookMode_PostNoCopy);
+    HookEvent("round_start",  FS_Round_Event,       EventHookMode_PostNoCopy);
     HookEvent("finale_start", FS_FinaleStart_Event, EventHookMode_PostNoCopy);
 }
 
-public Action:FS_Round_Event(Handle:event, const String:name[], bool:dontBroadcast)
+public Action FS_Round_Event(Event event, const char[] name, bool dontBroadcast)
 {
     FS_bIsFinale = false;
 }
 
-public Action:FS_FinaleStart_Event(Handle:event, const String:name[], bool:dontBroadcast)
+public Action FS_FinaleStart_Event(Event event, const char[] name, bool dontBroadcast)
 {
     FS_bIsFinale = true;
 }
 
-public FS_ConVarChange(Handle:convar, const String:oldValue[], const String:newValue[])
+public void FS_ConVarChange(ConVar convar, const char[] oldValue, const char[] newValue)
 {
-    FS_bEnabled = GetConVarBool(FS_hEnabled);
+    FS_bEnabled = FS_hEnabled.BoolValue;
 }
 
-public OnClientPostAdminCheck(client)
+public void OnClientPostAdminCheck(int client)
 {
     SDKHook(client, SDKHook_PreThinkPost, HookCallback);
 }
 
-public HookCallback(client)
+public void HookCallback(int client)
 {
     if (!FS_bEnabled || !IsPluginEnabled) return;
     if (!FS_bIsFinale) return;
@@ -55,21 +53,20 @@ public HookCallback(client)
 
     if (GetEntProp(client, Prop_Send, "m_ghostSpawnState") == STATE_TOOCLOSE)
     {
-        if (!TooClose(client))
-        {
-            SetEntProp(client, Prop_Send, "m_ghostSpawnState", STATE_SPAWNREADY);
-        }
+        if (!TooClose(client)) SetEntProp(client, Prop_Send, "m_ghostSpawnState", STATE_SPAWNREADY);
     }
 }
 
-bool:TooClose(client)
+bool TooClose(int client)
 {
-    decl Float:fInfLocation[3], Float:fSurvLocation[3], Float:fVector[3];
+    float fInfLocation[3];
+    float fSurvLocation[3];
+    float fVector[3];
     GetClientAbsOrigin(client, fInfLocation);
 
-    for (new i = 0; i < 4; i++)
+    for (int i = 0; i < 4; i++)
     {
-        new index = GetSurvivorIndex(i);
+        int index = GetSurvivorIndex(i);
         if (index == 0) continue;
         if (!IsPlayerAlive(index)) continue;
         GetClientAbsOrigin(index, fSurvLocation);

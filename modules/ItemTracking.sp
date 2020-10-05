@@ -1,3 +1,6 @@
+#pragma semicolon 1
+#pragma newdecls required
+
 #include <sourcemod>
 #include <sdktools>
 
@@ -5,153 +8,157 @@
 enum ItemList {
     IL_PainPills,
     IL_Adrenaline,
-    // Not sure we need these.
-    //IL_FirstAid,
-    //IL_Defib,
     IL_PipeBomb,
     IL_Molotov,
-    IL_VomitJar
+    IL_VomitJar,
+    IL_Size = 5
 };
-static Handle:g_hItemListTrie;
 
 // Names for cvars, kv, descriptions
-// [ItemIndex][shortname=0,fullname=1,spawnname=2]
 enum ItemNames {
     IN_shortname,
     IN_longname,
     IN_officialname,
-    IN_modelname
+    IN_modelname,
+    IN_Size = 4
 };
 
-static const String:g_sItemNames[ItemList][ItemNames][] =
+static StringMap g_smItemListTrie;
+
+static const char g_sItemNames[IL_Size][IN_Size][] =
 {
     { "pills", "pain pills", "pain_pills", "painpills" },
     { "adrenaline", "adrenaline shots", "adrenaline", "pipebomb" },
-    // { "kits", "first aid kits", "first_aid_kit", "medkit" },
-    // { "defib", "defibrillators", "defibrillator", "defibrillator" },
     { "pipebomb", "pipe bombs", "pipe_bomb", "pipebomb" },
     { "molotov", "molotovs", "molotov", "molotov" },
     { "vomitjar", "bile bombs", "vomitjar", "bile_flask" }
 };
 
-// Settings for item limiting.
-enum ItemLimitSettings
-{
-    Handle:cvar,
-    limitnum
-};
-
 // For spawn entires adt_array
-enum ItemTracking {
-    IT_entity,
-    Float:IT_origins,
-    Float:IT_origins1,
-    Float:IT_origins2,
-    Float:IT_angles,
-    Float:IT_angles1,
-    Float:IT_angles2
-};
+enum struct ItemTracking {
+    int   IT_entity;
+    float IT_origins;
+    float IT_origins1;
+    float IT_origins2;
+    float IT_angles;
+    float IT_angles1;
+    float IT_angles2;
+}
 
-static Handle:g_hCvarEnabled;
-static Handle:g_hCvarConsistentSpawns;
-static Handle:g_hCvarMapSpecificSpawns;
+int ItemTracking_blocksize = 0;
+
+static ConVar g_cvCvarEnabled;
+static ConVar g_cvCvarConsistentSpawns;
+static ConVar g_cvCvarMapSpecificSpawns;
+static ConVar g_cvSurvivorLimit;
+static ConVar g_cvCvarLimits[view_as<int>(IL_Size)];
 // ADT Array Handle for actual item spawns
-static Handle:g_hItemSpawns[ItemList];
+static ArrayList g_alItemSpawns[view_as<int>(IL_Size)];
 // CVAR Handle Array for item limits
-static Handle:g_hCvarLimits[ItemList];
 // Current item limits array
-static g_iItemLimits[ItemList];
+static int g_iSurvivorLimit;
+static int g_iSaferoomCount[2];
+static int g_iItemLimits[view_as<int>(IL_Size)];
 // Is round 1 over?
-static bool:g_bIsRound1Over;
+static bool g_bIsRound1Over;
 
-static g_iSaferoomCount[2];
-static Handle:g_hSurvivorLimit;
-static g_iSurvivorLimit;
+static bool IsModuleEnabled() {
+    return IsPluginEnabled() && g_cvCvarEnabled.BoolValue;
+}
 
-static bool:IsModuleEnabled() { return IsPluginEnabled() && GetConVarBool(g_hCvarEnabled); }
+static bool UseConsistentSpawns() {
+    return g_cvCvarConsistentSpawns.BoolValue;
+}
 
-static bool:UseConsistentSpawns() { return GetConVarBool(g_hCvarConsistentSpawns); }
+static int GetMapInfoMode() {
+    return g_cvCvarMapSpecificSpawns.IntValue;
+}
 
-static GetMapInfoMode() { return GetConVarInt(g_hCvarMapSpecificSpawns); }
-
-public IT_OnModuleStart()
+void IT_OnModuleStart()
 {
-    decl String:sNameBuf[64];
-    decl String:sCvarDescBuf[256];
+    char sNameBuf[64];
+    char sCvarDescBuf[256];
 
-    g_hCvarEnabled = CreateConVarEx("enable_itemtracking", "0", "Enable the itemtracking module");
-    g_hCvarConsistentSpawns = CreateConVarEx("itemtracking_savespawns", "0", "Keep item spawns the same on both rounds");
-    g_hCvarMapSpecificSpawns = CreateConVarEx("itemtracking_mapspecific", "0", "Change how mapinfo.txt overrides work. 0 = ignore mapinfo.txt, 1 = allow limit reduction, 2 = allow limit increases,");
+    g_cvCvarEnabled           = CreateConVarEx("enable_itemtracking",      "0", "Enable the itemtracking module");
+    g_cvCvarConsistentSpawns  = CreateConVarEx("itemtracking_savespawns",  "0", "Keep item spawns the same on both rounds");
+    g_cvCvarMapSpecificSpawns = CreateConVarEx("itemtracking_mapspecific", "0", "Change how mapinfo.txt overrides work. 0 = ignore mapinfo.txt, 1 = allow limit reduction, 2 = allow limit increases,");
 
     // Create itemlimit cvars
-    for(new i = 0; i < _:ItemList; i++)
+    for (int i = 0; i < view_as<int>(IL_Size); i++)
     {
-        Format(sNameBuf, sizeof(sNameBuf), "%s_limit", g_sItemNames[i][IN_shortname]);
+        Format(sNameBuf,     sizeof(sNameBuf),     "%s_limit",                                                                    g_sItemNames[i][IN_shortname]);
         Format(sCvarDescBuf, sizeof(sCvarDescBuf), "Limits the number of %s on each map. -1: no limit; >=0: limit to cvar value", g_sItemNames[i][IN_longname]);
-        g_hCvarLimits[i] = CreateConVarEx(sNameBuf, "-1", sCvarDescBuf);
+        g_cvCvarLimits[i] = CreateConVarEx(sNameBuf, "-1", sCvarDescBuf);
     }
 
     // Create name translation trie
-    g_hItemListTrie = CreateItemListTrie();
+    g_smItemListTrie = CreateItemListTrie();
 
-
+    ItemTracking itTemp;
+    ItemTracking_blocksize = sizeof(itTemp);
     // Create item spawns array;
-    for (new i = 0; i < _:ItemList; i++)
+    for (int i = 0; i < view_as<int>(IL_Size); i++)
     {
-        g_hItemSpawns[i] = CreateArray(_:ItemTracking);
+        g_alItemSpawns[i] = new ArrayList(ItemTracking_blocksize);
     }
 
 
     HookEvent("round_start", _IT_RoundStartEvent, EventHookMode_PostNoCopy);
-    HookEvent("round_end", _IT_RoundEndEvent, EventHookMode_PostNoCopy);
-    g_hSurvivorLimit = FindConVar("survivor_limit");
-    g_iSurvivorLimit = GetConVarInt(g_hSurvivorLimit);
-    HookConVarChange(g_hSurvivorLimit, _IT_SurvivorLimit_Change);
+    HookEvent("round_end",   _IT_RoundEndEvent,   EventHookMode_PostNoCopy);
+
+    g_cvSurvivorLimit = FindConVar("survivor_limit");
+    g_iSurvivorLimit  = g_cvSurvivorLimit.IntValue;
+    g_cvSurvivorLimit.AddChangeHook(_IT_SurvivorLimit_Change);
 }
 
-public IT_OnMapStart()
+void IT_OnMapStart()
 {
-    for (new i; i < _:ItemList; i++) g_iItemLimits[i] = GetConVarInt(g_hCvarLimits[i]);
+    for (int i = 0; i < view_as<int>(IL_Size); i++)
+    {
+        g_iItemLimits[i] = g_cvCvarLimits[i].IntValue;
+    }
+
     if (GetMapInfoMode())
     {
-        decl itemlimit;
-        new Handle:kOverrideLimits = CreateKeyValues("ItemLimits");
-        CopyMapSubsection(kOverrideLimits, "ItemLimits");
-        for (new i = 0; i < _:ItemList; i++)
+        int itemlimit;
+        KeyValues kvOverrideLimits = new KeyValues("ItemLimits");
+        CopyMapSubsection(kvOverrideLimits, "ItemLimits");
+
+        for (int i = 0; i < view_as<int>(IL_Size); i++)
         {
-            itemlimit = GetConVarInt(g_hCvarLimits[i]);
-            new temp = KvGetNum(kOverrideLimits, g_sItemNames[i][IN_officialname], itemlimit);
+            itemlimit = g_cvCvarLimits[i].IntValue;
+            int temp = kvOverrideLimits.GetNum(g_sItemNames[i][IN_officialname], itemlimit);
             if (((g_iItemLimits[i] > temp) && (GetMapInfoMode() & 1)) || ((g_iItemLimits[i] < temp) && (GetMapInfoMode() & 2)))
             {
                 g_iItemLimits[i] = temp;
             }
-            ClearArray(g_hItemSpawns[i]);
+            g_alItemSpawns[i].Clear();
         }
-        CloseHandle(kOverrideLimits);
+        delete kvOverrideLimits;
     }
     g_bIsRound1Over = false;
 }
 
-public _IT_RoundEndEvent(Handle:event, const String:name[], bool:dontBroadcast)
+public void _IT_RoundEndEvent(Event event, const char[] name, bool dontBroadcast)
 {
     g_bIsRound1Over = true;
 }
 
-public _IT_RoundStartEvent(Handle:event, const String:name[], bool:dontBroadcast)
+public void _IT_RoundStartEvent(Event event, const char[] name, bool dontBroadcast)
 {
     g_iSaferoomCount[START_SAFEROOM - 1] = 0;
-    g_iSaferoomCount[END_SAFEROOM - 1] = 0;
+    g_iSaferoomCount[END_SAFEROOM - 1]   = 0;
     // Mapstart happens after round_start most of the time, so we need to wait for g_bIsRound1Over.
     // Plus, we don't want to have conflicts with EntityRemover.
     CreateTimer(1.0, IT_RoundStartTimer);
 }
 
-public Action:IT_RoundStartTimer(Handle:timer)
+public Action IT_RoundStartTimer(Handle timer)
 {
-    if(!g_bIsRound1Over)
+    if (!g_bIsRound1Over)
     {
         // Round1
-        if(IsModuleEnabled())
+        if (IsModuleEnabled())
         {
             EnumAndElimSpawns();
         }
@@ -159,9 +166,9 @@ public Action:IT_RoundStartTimer(Handle:timer)
     else
     {
         // Round2
-        if(IsModuleEnabled())
+        if (IsModuleEnabled())
         {
-            if(UseConsistentSpawns())
+            if (UseConsistentSpawns())
             {
                 GenerateStoredSpawns();
             }
@@ -174,75 +181,54 @@ public Action:IT_RoundStartTimer(Handle:timer)
     return Plugin_Handled;
 }
 
-public _IT_SurvivorLimit_Change(Handle:convar, const String:oldValue[], const String:newValue[])
+public void _IT_SurvivorLimit_Change(ConVar convar, const char[] oldValue, const char[] newValue)
 {
     g_iSurvivorLimit = StringToInt(newValue);
 }
 
-static EnumAndElimSpawns()
+static void EnumAndElimSpawns()
 {
-    if(IsDebugEnabled())
-    {
-        LogMessage("[IT] Resetting g_iSaferoomCount and Enumerating and eliminating spawns...");
-    }
+    Debug_LogMessage("[IT] Resetting g_iSaferoomCount and Enumerating and eliminating spawns...");
     EnumerateSpawns();
     RemoveToLimits();
 }
 
-static GenerateStoredSpawns()
+static void GenerateStoredSpawns()
 {
     KillRegisteredItems();
     SpawnItems();
 }
 
-// For 3.0 rounds library
-/* public L4D2_OnRealRoundStart(roundNum)
-{
-    if(roundNum == 1)
-    {
-        EnumerateSpawns();
-        RemoveToLimits();
-    }
-    else
-    {
-        // We kill off all items we recognize.
-        // Unlimited items will be replaced, limited items will be spawned,
-        // and killed items will stay killed
-        KillRegisteredItems();
-        // Spawn up the same items that existed in round 1
-        SpawnItems();
-    }
-
-}*/
-
 // Produces the lookup trie for weapon spawn entities
 // to translate to our ADT array of spawns
-static Handle:CreateItemListTrie()
+static StringMap CreateItemListTrie()
 {
-    new Handle:mytrie = CreateTrie();
-    SetTrieValue(mytrie, "weapon_pain_pills_spawn", IL_PainPills);
-    SetTrieValue(mytrie, "weapon_pain_pills", IL_PainPills);
-    SetTrieValue(mytrie, "weapon_adrenaline_spawn", IL_Adrenaline);
-    SetTrieValue(mytrie, "weapon_adrenaline", IL_Adrenaline);
-    SetTrieValue(mytrie, "weapon_pipe_bomb_spawn", IL_PipeBomb);
-    SetTrieValue(mytrie, "weapon_pipe_bomb", IL_PipeBomb);
-    SetTrieValue(mytrie, "weapon_molotov_spawn", IL_Molotov);
-    SetTrieValue(mytrie, "weapon_molotov", IL_Molotov);
-    SetTrieValue(mytrie, "weapon_vomitjar_spawn", IL_VomitJar);
-    SetTrieValue(mytrie, "weapon_vomitjar", IL_VomitJar);
+    StringMap mytrie = new StringMap();
+    mytrie.SetValue("weapon_pain_pills_spawn", IL_PainPills);
+    mytrie.SetValue("weapon_pain_pills",       IL_PainPills);
+    mytrie.SetValue("weapon_adrenaline_spawn", IL_Adrenaline);
+    mytrie.SetValue("weapon_adrenaline",       IL_Adrenaline);
+    mytrie.SetValue("weapon_pipe_bomb_spawn",  IL_PipeBomb);
+    mytrie.SetValue("weapon_pipe_bomb",        IL_PipeBomb);
+    mytrie.SetValue("weapon_molotov_spawn",    IL_Molotov);
+    mytrie.SetValue("weapon_molotov",          IL_Molotov);
+    mytrie.SetValue("weapon_vomitjar_spawn",   IL_VomitJar);
+    mytrie.SetValue("weapon_vomitjar",         IL_VomitJar);
+
     return mytrie;
 }
 
-static KillRegisteredItems()
+static void KillRegisteredItems()
 {
-    decl ItemList:itemindex;
-    new psychonic = GetEntityCount();
-    for(new i =0; i < psychonic; i++)
+    ItemList itemindex;
+    int psychonic = GetEntityCount();
+
+    for (int i = 0; i < psychonic; i++)
     {
-        if(IsValidEntity(i))
+        if (IsValidEntity(i))
         {
             itemindex = GetItemIndexFromEntity(i);
-            if(itemindex >= ItemList:0 /* && !IsEntityInSaferoom(i) */ )
+            if (itemindex >= view_as<ItemList>(0) )
             {
                 if (IsEntityInSaferoom(i, START_SAFEROOM) && g_iSaferoomCount[START_SAFEROOM - 1] < g_iSurvivorLimit)
                 {
@@ -255,7 +241,7 @@ static KillRegisteredItems()
                 else
                 {
                     // Kill items we're tracking;
-                    if(!AcceptEntityInput(i, "kill"))
+                    if (!AcceptEntityInput(i, "kill"))
                     {
                         LogError("[IT] Error killing instance of item %s", g_sItemNames[itemindex][IN_longname]);
                     }
@@ -265,81 +251,80 @@ static KillRegisteredItems()
     }
 }
 
-static SpawnItems()
+static void SpawnItems()
 {
-    decl curitem[ItemTracking];
-    decl Float:origins[3], Float:angles[3];
-    new arrsize;
-    new itement;
-    decl String:sModelname[PLATFORM_MAX_PATH];
-    new WeaponIDs:wepid;
-    for(new itemidx = 0; itemidx < _:ItemList; itemidx++)
+    ItemTracking curitem;
+    float origins[3];
+    float angles[3];
+    int arrsize;
+    int itement;
+    char sModelname[PLATFORM_MAX_PATH];
+    WeaponIDs wepid;
+
+    for (int itemidx = 0; itemidx < view_as<int>(IL_Size); itemidx++)
     {
         Format(sModelname, sizeof(sModelname), "models/w_models/weapons/w_eq_%s.mdl", g_sItemNames[itemidx][IN_modelname]);
-        arrsize = GetArraySize(g_hItemSpawns[itemidx]);
-        for(new idx = 0; idx < arrsize; idx++)
+        arrsize = g_alItemSpawns[itemidx].Length;
+
+        for (int idx = 0; idx < arrsize; idx++)
         {
-            GetArrayArray(g_hItemSpawns[itemidx], idx, curitem[0]);
+            g_alItemSpawns[itemidx].GetArray(idx, curitem);
             GetSpawnOrigins(origins, curitem);
             GetSpawnAngles(angles, curitem);
-            wepid = GetWeaponIDFromItemList(ItemList:itemidx);
-            if(IsDebugEnabled())
-            {
-                LogMessage("[IT] Spawning an instance of item %s (%d, wepid %d), number %d, at %.02f %.02f %.02f",
+            wepid = GetWeaponIDFromItemList(view_as<ItemList>(itemidx));
+
+            Debug_LogMessage("[IT] Spawning an instance of item %s (%d, wepid %d), number %d, at %.02f %.02f %.02f",
                 g_sItemNames[itemidx][IN_officialname], itemidx, wepid, idx, origins[0], origins[1], origins[2]);
-            }
+
             itement = CreateEntityByName("weapon_spawn");
             SetEntProp(itement, Prop_Send, "m_weaponID", wepid);
             SetEntityModel(itement, sModelname);
             DispatchKeyValue(itement, "count", "1");
             TeleportEntity(itement, origins, angles, NULL_VECTOR);
             DispatchSpawn(itement);
-            SetEntityMoveType(itement,MOVETYPE_NONE);
+            SetEntityMoveType(itement, MOVETYPE_NONE);
         }
     }
 }
 
-static EnumerateSpawns()
+static void EnumerateSpawns()
 {
-    new ItemList:itemindex;
-    decl curitem[ItemTracking], Float:origins[3], Float:angles[3];
-    new psychonic = GetEntityCount();
-    for(new i =0; i < psychonic; i++)
+    ItemList itemindex;
+    ItemTracking curitem;
+    float origins[3];
+    float angles[3];
+    int psychonic = GetEntityCount();
+
+    for (int i = 0; i < psychonic; i++)
     {
-        if(IsValidEntity(i))
+        if (IsValidEntity(i))
         {
             itemindex = GetItemIndexFromEntity(i);
-            if(itemindex >= ItemList:0 /* && !IsEntityInSaferoom(i) */ )
+            if (itemindex >= view_as<ItemList>(0))
             {
                 if (IsEntityInSaferoom(i, START_SAFEROOM))
                 {
-                    if(g_iSaferoomCount[START_SAFEROOM - 1] < g_iSurvivorLimit)
+                    if (g_iSaferoomCount[START_SAFEROOM - 1] < g_iSurvivorLimit)
                         g_iSaferoomCount[START_SAFEROOM - 1]++;
-                    else if(!AcceptEntityInput(i, "kill"))
+                    else if (!AcceptEntityInput(i, "kill"))
                         LogError("[IT] Error killing instance of item %s", g_sItemNames[itemindex][IN_longname]);
                 }
                 else if (IsEntityInSaferoom(i, END_SAFEROOM))
                 {
-                    if(g_iSaferoomCount[END_SAFEROOM - 1] < g_iSurvivorLimit)
+                    if (g_iSaferoomCount[END_SAFEROOM - 1] < g_iSurvivorLimit)
                         g_iSaferoomCount[END_SAFEROOM - 1]++;
-                    else if(!AcceptEntityInput(i, "kill"))
+                    else if (!AcceptEntityInput(i, "kill"))
                         LogError("[IT] Error killing instance of item %s", g_sItemNames[itemindex][IN_longname]);
                 }
                 else
                 {
-                    new mylimit = GetItemLimit(itemindex);
-                    if(IsDebugEnabled())
-                    {
-                        LogMessage("[IT] Found an instance of item %s (%d), with limit %d", g_sItemNames[itemindex][IN_longname], itemindex, mylimit);
-                    }
+                    int mylimit = GetItemLimit(itemindex);
+                    Debug_LogMessage("[IT] Found an instance of item %s (%d), with limit %d", g_sItemNames[itemindex][IN_longname], itemindex, mylimit);
                     // Item limit is zero, justkill it as we find it
-                    if(!mylimit)
+                    if (!mylimit)
                     {
-                        if(IsDebugEnabled())
-                        {
-                            LogMessage("[IT] Killing spawn");
-                        }
-                        if(!AcceptEntityInput(i, "kill"))
+                        Debug_LogMessage("[IT] Killing spawn");
+                        if (!AcceptEntityInput(i, "kill"))
                         {
                             LogError("[IT] Error killing instance of item %s", g_sItemNames[itemindex][IN_longname]);
                         }
@@ -347,18 +332,15 @@ static EnumerateSpawns()
                     else
                     {
                         // Store entity, angles, origin
-                        curitem[IT_entity]=i;
-                        GetEntPropVector(i, Prop_Send, "m_vecOrigin", origins);
+                        curitem.IT_entity = i;
+                        GetEntPropVector(i, Prop_Send, "m_vecOrigin",   origins);
                         GetEntPropVector(i, Prop_Send, "m_angRotation", angles);
-                        if(IsDebugEnabled())
-                        {
-                            LogMessage("[IT] Saving spawn #%d at %.02f %.02f %.02f", GetArraySize(g_hItemSpawns[itemindex]), origins[0], origins[1], origins[2]);
-                        }
+                        Debug_LogMessage("[IT] Saving spawn #%d at %.02f %.02f %.02f", g_alItemSpawns[itemindex].Length, origins[0], origins[1], origins[2]);
                         SetSpawnOrigins(origins, curitem);
                         SetSpawnAngles(angles, curitem);
 
                         // Push this instance onto our array for that item
-                        PushArrayArray(g_hItemSpawns[itemindex], curitem[0]);
+                        g_alItemSpawns[itemindex].PushArray(curitem);
                     }
                 }
             }
@@ -366,71 +348,69 @@ static EnumerateSpawns()
     }
 }
 
-static RemoveToLimits()
+static void RemoveToLimits()
 {
-    new curlimit;
-    decl curitem[ItemTracking];
-    for(new itemidx = 0; itemidx < _:ItemList; itemidx++)
+    int curlimit;
+    ItemTracking curitem;
+
+    for (int itemidx = 0; itemidx < view_as<int>(IL_Size); itemidx++)
     {
-        curlimit = GetItemLimit(ItemList:itemidx);
-        if (curlimit >0)
+        curlimit = GetItemLimit(view_as<ItemList>(itemidx));
+        if (curlimit > 0)
         {
             // Kill off item spawns until we've reduced the item to the limit
-            while(GetArraySize(g_hItemSpawns[itemidx]) > curlimit)
+            while (g_alItemSpawns[itemidx].Length > curlimit)
             {
                 // Pick a random
-                new killidx = GetURandomIntRange(0, GetArraySize(g_hItemSpawns[itemidx])-1);
-                if(IsDebugEnabled())
-                {
-                    LogMessage("[IT] Killing randomly chosen %s (%d) #%d", g_sItemNames[itemidx][IN_longname], itemidx, killidx);
-                }
-                GetArrayArray(g_hItemSpawns[itemidx], killidx, curitem[0]);
-                if(IsValidEntity(curitem[IT_entity]) && !AcceptEntityInput(curitem[IT_entity], "kill"))
+                int killidx = GetURandomIntRange(0, g_alItemSpawns[itemidx].Length - 1);
+                Debug_LogMessage("[IT] Killing randomly chosen %s (%d) #%d", g_sItemNames[itemidx][IN_longname], itemidx, killidx);
+                g_alItemSpawns[itemidx].GetArray(killidx, curitem);
+                if (IsValidEntity(curitem.IT_entity) && !AcceptEntityInput(curitem.IT_entity, "kill"))
                 {
                     LogError("[IT] Error killing instance of item %s", g_sItemNames[itemidx][IN_longname]);
                 }
-                RemoveFromArray(g_hItemSpawns[itemidx],killidx);
+                g_alItemSpawns[itemidx].Erase(killidx);
             }
         }
         // If limit is 0, they're already dead. If it's negative, we kill nothing.
     }
 }
 
-static SetSpawnOrigins(const Float:buf[3], spawn[ItemTracking])
+static void SetSpawnOrigins(const float buf[3], ItemTracking spawn)
 {
-    spawn[IT_origins]=buf[0];
-    spawn[IT_origins1]=buf[1];
-    spawn[IT_origins2]=buf[2];
+    spawn.IT_origins  = buf[0];
+    spawn.IT_origins1 = buf[1];
+    spawn.IT_origins2 = buf[2];
 }
 
-static SetSpawnAngles(const Float:buf[3], spawn[ItemTracking])
+static void SetSpawnAngles(const float buf[3], ItemTracking spawn)
 {
-    spawn[IT_angles]=buf[0];
-    spawn[IT_angles1]=buf[1];
-    spawn[IT_angles2]=buf[2];
+    spawn.IT_angles  = buf[0];
+    spawn.IT_angles1 = buf[1];
+    spawn.IT_angles2 = buf[2];
 }
 
-static GetSpawnOrigins(Float:buf[3], const spawn[ItemTracking])
+static void GetSpawnOrigins(float buf[3], ItemTracking spawn)
 {
-    buf[0]=spawn[IT_origins];
-    buf[1]=spawn[IT_origins1];
-    buf[2]=spawn[IT_origins2];
+    buf[0] = spawn.IT_origins;
+    buf[1] = spawn.IT_origins1;
+    buf[2] = spawn.IT_origins2;
 }
 
-static GetSpawnAngles(Float:buf[3], const spawn[ItemTracking])
+static void GetSpawnAngles(float buf[3], ItemTracking spawn)
 {
-    buf[0]=spawn[IT_angles];
-    buf[1]=spawn[IT_angles1];
-    buf[2]=spawn[IT_angles2];
+    buf[0] = spawn.IT_angles;
+    buf[1] = spawn.IT_angles1;
+    buf[2] = spawn.IT_angles2;
 }
 
-static GetItemLimit(ItemList:itemidx)
+static int GetItemLimit(ItemList itemidx)
 {
     return g_iItemLimits[itemidx];
 }
 
 
-static WeaponIDs:GetWeaponIDFromItemList(ItemList:id)
+static WeaponIDs GetWeaponIDFromItemList(ItemList id)
 {
     switch(id)
     {
@@ -454,27 +434,26 @@ static WeaponIDs:GetWeaponIDFromItemList(ItemList:id)
         {
             return WEPID_VOMITJAR;
         }
-        default:
-        {
-
-        }
     }
-    return WeaponIDs:-1;
+
+    return view_as<WeaponIDs>(-1);
 }
 
-static ItemList:GetItemIndexFromEntity(entity)
+static ItemList GetItemIndexFromEntity(int entity)
 {
-    static String:classname[128];
-    new ItemList:index;
+    static char classname[128];
+    ItemList index;
     GetEdictClassname(entity, classname, sizeof(classname));
-    if(GetTrieValue(g_hItemListTrie, classname, index))
+
+    if (g_smItemListTrie.GetValue(classname, index))
     {
         return index;
     }
 
-    if(StrEqual(classname, "weapon_spawn") || StrEqual(classname, "weapon_item_spawn"))
+    if (StrEqual(classname, "weapon_spawn") || StrEqual(classname, "weapon_item_spawn"))
     {
-        new WeaponIDs:id = WeaponIDs:GetEntProp(entity, Prop_Send, "m_weaponID");
+        WeaponIDs id = view_as<WeaponIDs>(GetEntProp(entity, Prop_Send, "m_weaponID"));
+
         switch(id)
         {
             case WEPID_VOMITJAR:
@@ -497,12 +476,8 @@ static ItemList:GetItemIndexFromEntity(entity)
             {
                 return IL_Adrenaline;
             }
-            default:
-            {
-
-            }
         }
     }
 
-    return ItemList:-1;
+    return view_as<ItemList>(-1);
 }

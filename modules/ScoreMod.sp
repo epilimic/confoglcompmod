@@ -1,128 +1,128 @@
 #pragma semicolon 1
+#pragma newdecls required
 
 #include <sourcemod>
 #include <sdktools>
 
-#define DEBUG_SM    0
+#define DEBUG_SM                    0
 
-new SM_iDefaultSurvivalBonus;
-new SM_iDefaultTieBreaker;
-new SM_iPillPercent;
-new SM_iAdrenPercent;
+int             SM_iFirstScore;
+int             SM_iDefaultSurvivalBonus;
+int             SM_iDefaultTieBreaker;
+int             SM_iPillPercent;
+int             SM_iAdrenPercent;
 
-new Float:SM_fHealPercent;
-new Float:SM_fMapMulti;
-new Float:SM_fHBRatio;
-new Float:SM_fSurvivalBonusRatio;
-new Float:SM_fTempMulti[3];
+float           SM_fHealPercent;
+float           SM_fMapMulti;
+float           SM_fHBRatio;
+float           SM_fSurvivalBonusRatio;
+float           SM_fTempMulti[3];
 
-new bool:SM_bModuleIsEnabled;
-new bool:SM_bHooked = false;
+bool            SM_bModuleIsEnabled;
+bool            SM_bHooked;
 
 // Saves first round score
-new bool:SM_bIsFirstRoundOver = false;
-new bool:SM_bIsSecondRoundStarted = false;
-new bool:SM_bIsSecondRoundOver = false;
-new SM_iFirstScore;
+bool            SM_bIsFirstRoundOver;
+bool            SM_bIsSecondRoundStarted;
+bool            SM_bIsSecondRoundOver;
 
 // Cvars
-new Handle:SM_hEnable;
-new Handle:SM_hHBRatio;
-new Handle:SM_hSurvivalBonusRatio;
-new Handle:SM_hMapMulti;
-new Handle:SM_hCustomMaxDistance;
+ConVar          SM_cvEnable;
+ConVar          SM_cvHBRatio;
+ConVar          SM_cvSurvivalBonusRatio;
+ConVar          SM_cvMapMulti;
+ConVar          SM_cvCustomMaxDistance;
 
 // Default Cvar Values
-new Handle:SM_hSurvivalBonus;
-new Handle:SM_hTieBreaker;
-new Handle:SM_hHealPercent;
-new Handle:SM_hPillPercent;
-new Handle:SM_hAdrenPercent;
-new Handle:SM_hTempMulti0;
-new Handle:SM_hTempMulti1;
-new Handle:SM_hTempMulti2;
+ConVar          SM_cvSurvivalBonus;
+ConVar          SM_cvTieBreaker;
+ConVar          SM_cvHealPercent;
+ConVar          SM_cvPillPercent;
+ConVar          SM_cvAdrenPercent;
+ConVar          SM_cvTempMulti0;
+ConVar          SM_cvTempMulti1;
+ConVar          SM_cvTempMulti2;
 
-public SM_OnModuleStart()
+void SM_OnModuleStart()
 {
-    SM_hEnable = CreateConVarEx("SM_enable", "1", "L4D2 Custom Scoring - Enable/Disable", CVAR_FLAGS);
-    HookConVarChange(SM_hEnable, SM_ConVarChanged_Enable);
+    SM_cvEnable              = CreateConVarEx("SM_enable", "1", "L4D2 Custom Scoring - Enable/Disable", CVAR_FLAGS);
+    SM_cvEnable.AddChangeHook(SM_ConVarChanged_Enable);
 
-    SM_hHBRatio = CreateConVarEx("SM_healthbonusratio", "2.0", "L4D2 Custom Scoring - Healthbonus Multiplier", CVAR_FLAGS, true, 0.25, true, 5.0);
-    HookConVarChange(SM_hHBRatio, SM_CVChanged_HealthBonusRatio);
+    SM_cvHBRatio             = CreateConVarEx("SM_healthbonusratio", "2.0", "L4D2 Custom Scoring - Healthbonus Multiplier", CVAR_FLAGS, true, 0.25, true, 5.0);
+    SM_cvHBRatio.AddChangeHook(SM_CVChanged_HealthBonusRatio);
 
-    SM_hSurvivalBonusRatio = CreateConVarEx("SM_survivalbonusratio", "0.0", "Ratio to be used for a static survival bonus against Map distance. 25% == 100 points maximum health bonus on a 400 distance map", CVAR_FLAGS);
-    HookConVarChange(SM_hSurvivalBonusRatio, SM_CVChanged_SurvivalBonusRatio);
+    SM_cvSurvivalBonusRatio  = CreateConVarEx("SM_survivalbonusratio", "0.0", "Ratio to be used for a static survival bonus against Map distance. 25% == 100 points maximum health bonus on a 400 distance map", CVAR_FLAGS);
+    SM_cvSurvivalBonusRatio.AddChangeHook(SM_CVChanged_SurvivalBonusRatio);
 
-    SM_hTempMulti0 = CreateConVarEx("SM_tempmulti_incap_0", "0.30625", "L4D2 Custom Scoring - How important temp health is on survivors who have had no incaps", CVAR_FLAGS, true, 0.0, true, 1.0);
-    HookConVarChange(SM_hTempMulti0, SM_ConVarChanged_TempMulti0);
+    SM_cvTempMulti0          = CreateConVarEx("SM_tempmulti_incap_0", "0.30625", "L4D2 Custom Scoring - How important temp health is on survivors who have had no incaps", CVAR_FLAGS, true, 0.0, true, 1.0);
+    SM_cvTempMulti0.AddChangeHook(SM_ConVarChanged_TempMulti0);
 
-    SM_hTempMulti1 = CreateConVarEx("SM_tempmulti_incap_1", "0.17500", "L4D2 Custom Scoring - How important temp health is on survivors who have had one incap", CVAR_FLAGS, true, 0.0, true, 1.0);
-    HookConVarChange(SM_hTempMulti1, SM_ConVarChanged_TempMulti1);
+    SM_cvTempMulti1          = CreateConVarEx("SM_tempmulti_incap_1", "0.17500", "L4D2 Custom Scoring - How important temp health is on survivors who have had one incap", CVAR_FLAGS, true, 0.0, true, 1.0);
+    SM_cvTempMulti1.AddChangeHook(SM_ConVarChanged_TempMulti1);
 
-    SM_hTempMulti2 = CreateConVarEx("SM_tempmulti_incap_2", "0.10000", "L4D2 Custom Scoring - How important temp health is on survivors who have had two incaps (black and white)", CVAR_FLAGS, true, 0.0, true, 1.0);
-    HookConVarChange(SM_hTempMulti2, SM_ConVarChanged_TempMulti2);
+    SM_cvTempMulti2          = CreateConVarEx("SM_tempmulti_incap_2", "0.10000", "L4D2 Custom Scoring - How important temp health is on survivors who have had two incaps (black and white)", CVAR_FLAGS, true, 0.0, true, 1.0);
+    SM_cvTempMulti2.AddChangeHook(SM_ConVarChanged_TempMulti2);
 
-    SM_fTempMulti[0] = GetConVarFloat(SM_hTempMulti0);
-    SM_fTempMulti[1] = GetConVarFloat(SM_hTempMulti1);
-    SM_fTempMulti[2] = GetConVarFloat(SM_hTempMulti2);
+    SM_fTempMulti[0]         = SM_cvTempMulti0.FloatValue;
+    SM_fTempMulti[1]         = SM_cvTempMulti1.FloatValue;
+    SM_fTempMulti[2]         = SM_cvTempMulti2.FloatValue;
 
-    SM_hMapMulti = CreateConVarEx("SM_mapmulti", "1", "L4D2 Custom Scoring - Increases Healthbonus Max to Distance Max", CVAR_FLAGS);
+    SM_cvMapMulti            = CreateConVarEx("SM_mapmulti",          "1", "L4D2 Custom Scoring - Increases Healthbonus Max to Distance Max", CVAR_FLAGS);
+    SM_cvCustomMaxDistance   = CreateConVarEx("SM_custommaxdistance", "0", "L4D2 Custom Scoring - Custom max distance from config", CVAR_FLAGS);
 
-    SM_hCustomMaxDistance = CreateConVarEx("SM_custommaxdistance", "0", "L4D2 Custom Scoring - Custom max distance from config", CVAR_FLAGS);
+    SM_cvSurvivalBonus       = FindConVar("vs_survival_bonus");
+    SM_cvTieBreaker          = FindConVar("vs_tiebreak_bonus");
+    SM_cvHealPercent         = FindConVar("first_aid_heal_percent");
+    SM_cvPillPercent         = FindConVar("pain_pills_health_value");
+    SM_cvAdrenPercent        = FindConVar("adrenaline_health_buffer");
 
-    SM_hSurvivalBonus = FindConVar("vs_survival_bonus");
-    SM_hTieBreaker = FindConVar("vs_tiebreak_bonus");
+    SM_iDefaultSurvivalBonus = SM_cvSurvivalBonus.IntValue;
+    SM_iDefaultTieBreaker    = SM_cvTieBreaker.IntValue;
+    SM_fHealPercent          = SM_cvHealPercent.FloatValue;
+    SM_iPillPercent          = SM_cvPillPercent.IntValue;
+    SM_iAdrenPercent         = SM_cvAdrenPercent.IntValue;
 
-    SM_hHealPercent = FindConVar("first_aid_heal_percent");
-    SM_hPillPercent = FindConVar("pain_pills_health_value");
-    SM_hAdrenPercent = FindConVar("adrenaline_health_buffer");
-    HookConVarChange(SM_hHealPercent, SM_ConVarChanged_Health);
-    HookConVarChange(SM_hPillPercent, SM_ConVarChanged_Health);
-    HookConVarChange(SM_hAdrenPercent, SM_ConVarChanged_Health);
-
-    SM_iDefaultSurvivalBonus = GetConVarInt(SM_hSurvivalBonus);
-    SM_iDefaultTieBreaker = GetConVarInt(SM_hTieBreaker);
-    SM_fHealPercent = GetConVarFloat(SM_hHealPercent);
-    SM_iPillPercent = GetConVarInt(SM_hPillPercent);
-    SM_iAdrenPercent = GetConVarInt(SM_hAdrenPercent);
+    SM_cvHealPercent.AddChangeHook(SM_ConVarChanged_Health);
+    SM_cvPillPercent.AddChangeHook(SM_ConVarChanged_Health);
+    SM_cvAdrenPercent.AddChangeHook(SM_ConVarChanged_Health);
 
     RegConsoleCmd("sm_health", SM_Cmd_Health);
 }
 
-public SM_OnModuleEnd()
+public void SM_OnModuleEnd()
 {
     PluginDisable(false);
 }
 
-public SM_OnMapStart()
+public void SM_OnMapStart()
 {
     if (!IsPluginEnabled()) return;
 
-    if (!GetConVarBool(SM_hMapMulti)) SM_fMapMulti = 1.00;
+    if (!SM_cvMapMulti.BoolValue) SM_fMapMulti = 1.00;
     else SM_fMapMulti = float(GetMapMaxScore()) / 400.0;
 
-    SM_bModuleIsEnabled = GetConVarBool(SM_hEnable);
+    SM_bModuleIsEnabled = SM_cvEnable.BoolValue;
 
     if (SM_bModuleIsEnabled && !SM_bHooked) PluginEnable();
-    if (SM_bModuleIsEnabled) SetConVarInt(SM_hTieBreaker, 0);
-    if (SM_bModuleIsEnabled && GetConVarBool(SM_hCustomMaxDistance) && GetCustomMapMaxScore() > -1)
+    if (SM_bModuleIsEnabled) SM_cvTieBreaker.IntValue = 0;
+    if (SM_bModuleIsEnabled && SM_cvCustomMaxDistance.BoolValue && GetCustomMapMaxScore() > -1)
     {
         SetMapMaxScore(GetCustomMapMaxScore());
         // to allow a distance score of 0 and a health bonus
         if (GetCustomMapMaxScore() > 0) SM_fMapMulti = float(GetCustomMapMaxScore()) / 400.0;
     }
 
-    SM_bIsFirstRoundOver = false;
+    SM_bIsFirstRoundOver     = false;
     SM_bIsSecondRoundStarted = false;
-    SM_bIsSecondRoundOver = false;
-    SM_iFirstScore = 0;
+    SM_bIsSecondRoundOver    = false;
+    SM_iFirstScore           = 0;
 
-    SM_fTempMulti[0] = GetConVarFloat(SM_hTempMulti0);
-    SM_fTempMulti[1] = GetConVarFloat(SM_hTempMulti1);
-    SM_fTempMulti[2] = GetConVarFloat(SM_hTempMulti2);
+    SM_fTempMulti[0]         = SM_cvTempMulti0.FloatValue;
+    SM_fTempMulti[1]         = SM_cvTempMulti1.FloatValue;
+    SM_fTempMulti[2]         = SM_cvTempMulti2.FloatValue;
 }
 
-public SM_ConVarChanged_Enable(Handle:convar, const String:oldValue[], const String:newValue[])
+public void SM_ConVarChanged_Enable(ConVar convar, const char[] oldValue, const char[] newValue)
 {
     if (StringToInt(newValue) == 0)
     {
@@ -136,187 +136,204 @@ public SM_ConVarChanged_Enable(Handle:convar, const String:oldValue[], const Str
     }
 }
 
-public SM_ConVarChanged_TempMulti0(Handle:convar, const String:oldValue[], const String:newValue[]) SM_fTempMulti[0] = StringToFloat(newValue);
-public SM_ConVarChanged_TempMulti1(Handle:convar, const String:oldValue[], const String:newValue[]) SM_fTempMulti[1] = StringToFloat(newValue);
-public SM_ConVarChanged_TempMulti2(Handle:convar, const String:oldValue[], const String:newValue[]) SM_fTempMulti[2] = StringToFloat(newValue);
-
-public SM_CVChanged_HealthBonusRatio(Handle:convar, const String:oldValue[], const String:newValue[]) SM_fHBRatio = StringToFloat(newValue);
-public SM_CVChanged_SurvivalBonusRatio(Handle:convar, const String:oldValue[], const String:newValue[]) SM_fSurvivalBonusRatio = StringToFloat(newValue);
-
-public SM_ConVarChanged_Health(Handle:convar, const String:oldValue[], const String:newValue[])
+public void SM_ConVarChanged_TempMulti0(ConVar convar, const char[] oldValue, const char[] newValue)
 {
-    SM_fHealPercent = GetConVarFloat(SM_hHealPercent);
-    SM_iPillPercent = GetConVarInt(SM_hPillPercent);
-    SM_iAdrenPercent = GetConVarInt(SM_hAdrenPercent);
+    SM_fTempMulti[0] = StringToFloat(newValue);
 }
 
-PluginEnable()
+public void SM_ConVarChanged_TempMulti1(ConVar convar, const char[] oldValue, const char[] newValue)
 {
-    HookEvent("door_close", SM_DoorClose_Event);
-    HookEvent("player_death", SM_PlayerDeath_Event);
-    HookEvent("round_end", SM_RoundEnd_Event);
-    HookEvent("round_start", SM_RoundStart_Event);
+    SM_fTempMulti[1] = StringToFloat(newValue);
+}
+
+public void SM_ConVarChanged_TempMulti2(ConVar convar, const char[] oldValue, const char[] newValue)
+{
+    SM_fTempMulti[2] = StringToFloat(newValue);
+}
+
+public void SM_CVChanged_HealthBonusRatio(ConVar convar, const char[] oldValue, const char[] newValue)
+{
+    SM_fHBRatio = StringToFloat(newValue);
+}
+
+public void SM_CVChanged_SurvivalBonusRatio(ConVar convar, const char[] oldValue, const char[] newValue)
+{
+    SM_fSurvivalBonusRatio = StringToFloat(newValue);
+}
+
+public void SM_ConVarChanged_Health(ConVar convar, const char[] oldValue, const char[] newValue)
+{
+    SM_fHealPercent  = SM_cvHealPercent.FloatValue;
+    SM_iPillPercent  = SM_cvPillPercent.IntValue;
+    SM_iAdrenPercent = SM_cvAdrenPercent.IntValue;
+}
+
+void PluginEnable()
+{
+    HookEvent("door_close",             SM_DoorClose_Event);
+    HookEvent("player_death",           SM_PlayerDeath_Event);
+    HookEvent("round_end",              SM_RoundEnd_Event);
+    HookEvent("round_start",            SM_RoundStart_Event);
     HookEvent("finale_vehicle_leaving", SM_FinaleVehicleLeaving_Event, EventHookMode_PostNoCopy);
-    RegConsoleCmd("say", SM_Command_Say);
+
+    RegConsoleCmd("say",      SM_Command_Say);
     RegConsoleCmd("say_team", SM_Command_Say);
-    SM_fHBRatio = GetConVarFloat(SM_hHBRatio);
-    SM_fSurvivalBonusRatio = GetConVarFloat(SM_hSurvivalBonusRatio);
-    SM_iDefaultSurvivalBonus = GetConVarInt(SM_hSurvivalBonus);
-    SM_iDefaultTieBreaker = GetConVarInt(SM_hTieBreaker);
-    SetConVarInt(SM_hTieBreaker, 0);
-    SM_fHealPercent = GetConVarFloat(SM_hHealPercent);
-    SM_iPillPercent = GetConVarInt(SM_hPillPercent);
-    SM_iAdrenPercent = GetConVarInt(SM_hAdrenPercent);
-    SM_bHooked = true;
+
+    SM_fHBRatio              = SM_cvHBRatio.FloatValue;
+    SM_fSurvivalBonusRatio   = SM_cvSurvivalBonusRatio.FloatValue;
+    SM_iDefaultSurvivalBonus = SM_cvSurvivalBonus.IntValue;
+    SM_iDefaultTieBreaker    = SM_cvTieBreaker.IntValue;
+    SM_cvTieBreaker.IntValue = 0;
+    SM_fHealPercent          = SM_cvHealPercent.FloatValue;
+    SM_iPillPercent          = SM_cvPillPercent.IntValue;
+    SM_iAdrenPercent         = SM_cvAdrenPercent.IntValue;
+    SM_bHooked               = true;
 }
 
-PluginDisable(bool:unhook=true)
+void PluginDisable(bool unhook=true)
 {
-    if(unhook)
+    if (unhook)
     {
-        UnhookEvent("door_close", SM_DoorClose_Event);
-        UnhookEvent("player_death", SM_PlayerDeath_Event);
-        UnhookEvent("round_end", SM_RoundEnd_Event, EventHookMode_PostNoCopy);
-        UnhookEvent("round_start", SM_RoundStart_Event, EventHookMode_PostNoCopy);
+        UnhookEvent("door_close",             SM_DoorClose_Event);
+        UnhookEvent("player_death",           SM_PlayerDeath_Event);
+        UnhookEvent("round_end",              SM_RoundEnd_Event, EventHookMode_PostNoCopy);
+        UnhookEvent("round_start",            SM_RoundStart_Event, EventHookMode_PostNoCopy);
         UnhookEvent("finale_vehicle_leaving", SM_FinaleVehicleLeaving_Event, EventHookMode_PostNoCopy);
     }
-    SetConVarInt(SM_hSurvivalBonus, SM_iDefaultSurvivalBonus);
-    SetConVarInt(SM_hTieBreaker, SM_iDefaultTieBreaker);
-    SM_bHooked = false;
+
+    SM_cvSurvivalBonus.IntValue = SM_iDefaultSurvivalBonus;
+    SM_cvTieBreaker.IntValue    = SM_iDefaultTieBreaker;
+    SM_bHooked                  = false;
 }
 
-public Action:SM_DoorClose_Event(Handle:event, const String:name[], bool:dontBroadcast)
+public Action SM_DoorClose_Event(Event event, const char[] name, bool dontBroadcast)
 {
     if (!SM_bModuleIsEnabled || !IsPluginEnabled()) return;
-    if (GetEventBool(event, "checkpoint"))
+    if (event.GetBool("checkpoint"))
     {
-        SetConVarInt(SM_hSurvivalBonus, SM_CalculateSurvivalBonus());
+        SM_cvSurvivalBonus.IntValue = SM_CalculateSurvivalBonus();
     }
 }
 
-public Action:SM_PlayerDeath_Event(Handle:event, const String:name[], bool:dontBroadcast)
+public Action SM_PlayerDeath_Event(Event event, const char[] name, bool dontBroadcast)
 {
     if (!SM_bModuleIsEnabled || !IsPluginEnabled()) return;
-    new client = GetClientOfUserId(GetEventInt(event, "userid"));
+    int client = GetClientOfUserId(event.GetInt("userid"));
     // Can't just check for fakeclient
-    if(client && GetClientTeam(client) == 2)
-    {
-        SetConVarInt(SM_hSurvivalBonus, SM_CalculateSurvivalBonus());
-    }
-
+    if (client && GetClientTeam(client) == 2) SM_cvSurvivalBonus.IntValue = (SM_CalculateSurvivalBonus());
 }
 
-public Action:SM_RoundEnd_Event(Handle:event, const String:name[], bool:dontBroadcast)
+public Action SM_RoundEnd_Event(Event event, const char[] name, bool dontBroadcast)
 {
     if (!SM_bModuleIsEnabled || !IsPluginEnabled()) return;
-    if(!SM_bIsFirstRoundOver)
+    if (!SM_bIsFirstRoundOver)
     {
         // First round just ended, save the current score.
+        int iAliveCount;
         SM_bIsFirstRoundOver = true;
-        decl iAliveCount;
         SM_iFirstScore = RoundToFloor(SM_CalculateAvgHealth(iAliveCount) * SM_fMapMulti * SM_fHBRatio + 400 * SM_fMapMulti * SM_fSurvivalBonusRatio * iAliveCount / 4.0);
 
         // If the score is nonzero, trust the SurvivalBonus var.
-        SM_iFirstScore = (SM_iFirstScore ? GetConVarInt(SM_hSurvivalBonus) *iAliveCount : 0);
+        SM_iFirstScore = (SM_iFirstScore ? SM_cvSurvivalBonus.IntValue * iAliveCount : 0);
         PrintToChatAll("\x01[\x05Confogl\x01] Round 1 Bonus: \x04%d", SM_iFirstScore);
-        if (GetConVarBool(SM_hCustomMaxDistance) && GetCustomMapMaxScore() > -1) PrintToChatAll("\x01[\x05Confogl\x01] Custom Max Distance: \x04%d", GetCustomMapMaxScore());
+        if (SM_cvCustomMaxDistance.BoolValue && GetCustomMapMaxScore() > -1) PrintToChatAll("\x01[\x05Confogl\x01] Custom Max Distance: \x04%d", GetCustomMapMaxScore());
     }
     else if (SM_bIsSecondRoundStarted && !SM_bIsSecondRoundOver)
     {
         SM_bIsSecondRoundOver = true;
         // Second round has ended, print scores
-
-        decl iAliveCount;
-        new iScore = RoundToFloor(SM_CalculateAvgHealth(iAliveCount) * SM_fMapMulti * SM_fHBRatio + 400 * SM_fMapMulti * SM_fSurvivalBonusRatio * iAliveCount / 4.0);
+        int iAliveCount;
+        int iScore = RoundToFloor(SM_CalculateAvgHealth(iAliveCount) * SM_fMapMulti * SM_fHBRatio + 400 * SM_fMapMulti * SM_fSurvivalBonusRatio * iAliveCount / 4.0);
         // If the score is nonzero, trust the SurvivalBonus var.
-        iScore = iScore ? GetConVarInt(SM_hSurvivalBonus) * iAliveCount : 0;
+        iScore = iScore ? SM_cvSurvivalBonus.IntValue * iAliveCount : 0;
         PrintToChatAll("\x01[\x05Confogl\x01] Round 1 Bonus: \x04%d", SM_iFirstScore);
         PrintToChatAll("\x01[\x05Confogl\x01] Round 2 Bonus: \x04%d", iScore);
-        if (GetConVarBool(SM_hCustomMaxDistance) && GetCustomMapMaxScore() > -1) PrintToChatAll("\x01[\x05Confogl\x01] Custom Max Distance: \x04%d", GetCustomMapMaxScore());
+        if (SM_cvCustomMaxDistance.BoolValue && GetCustomMapMaxScore() > -1) PrintToChatAll("\x01[\x05Confogl\x01] Custom Max Distance: \x04%d", GetCustomMapMaxScore());
     }
 }
-public Action:SM_RoundStart_Event(Handle:event, const String:name[], bool:dontBroadcast)
+public Action SM_RoundStart_Event(Event event, const char[] name, bool dontBroadcast)
 {
     if (!SM_bModuleIsEnabled || !IsPluginEnabled()) return;
-    if(SM_bIsFirstRoundOver)
-    {
-        // Mark the beginning of the second round.
-        SM_bIsSecondRoundStarted = true;
-    }
+    // Mark the beginning of the second round.
+    if (SM_bIsFirstRoundOver) SM_bIsSecondRoundStarted = true;
 }
 
-public Action:SM_FinaleVehicleLeaving_Event(Handle:event, const String:name[], bool:dontBroadcast)
+public Action SM_FinaleVehicleLeaving_Event(Event event, const char[] name, bool dontBroadcast)
 {
     if (!SM_bModuleIsEnabled || !IsPluginEnabled()) return;
 
-    SetConVarInt(SM_hSurvivalBonus, SM_CalculateSurvivalBonus());
+    SM_cvSurvivalBonus.IntValue = SM_CalculateSurvivalBonus();
 }
 
-SM_IsPlayerIncap(client) return GetEntProp(client, Prop_Send, "m_isIncapacitated");
+int SM_IsPlayerIncap(int client)
+{
+    return GetEntProp(client, Prop_Send, "m_isIncapacitated");
+}
 
-public Action:SM_Cmd_Health(client, args)
+public Action SM_Cmd_Health(int client, int args)
 {
     if (!SM_bModuleIsEnabled || !IsPluginEnabled()) return;
 
-    decl iAliveCount;
-    new Float:fAvgHealth = SM_CalculateAvgHealth(iAliveCount);
+    int iAliveCount;
+    float fAvgHealth = SM_CalculateAvgHealth(iAliveCount);
 
     if (SM_bIsSecondRoundStarted) PrintToChat(client, "\x01[\x05Confogl\x01] Round 1 Bonus: \x04%d", SM_iFirstScore);
 
     if (client) PrintToChat(client, "\x01[\x05Confogl\x01] Average Health: \x04%.02f", fAvgHealth);
     else PrintToServer("[Confogl] Average Health: %.02f", fAvgHealth);
 
-    new iScore = RoundToFloor(fAvgHealth * SM_fMapMulti * SM_fHBRatio) * iAliveCount ;
+    int iScore = RoundToFloor(fAvgHealth * SM_fMapMulti * SM_fHBRatio) * iAliveCount ;
 
-    if(DEBUG_SM || IsDebugEnabled())
+    if (DEBUG_SM || IsDebugEnabled())
         LogMessage("[ScoreMod] CalcScore: %d MapMulti: %.02f Multiplier %.02f", iScore, SM_fMapMulti, SM_fHBRatio);
 
     if (client)
     {
         PrintToChat(client, "\x01[\x05Confogl\x01] Health Bonus: \x04%d", iScore );
         if (SM_fSurvivalBonusRatio != 0.0) PrintToChat(client, "\x01[\x05Confogl\x01] Static Survival Bonus Per Survivor: \x04%d", RoundToFloor(400 * SM_fMapMulti * SM_fSurvivalBonusRatio));
-        if (GetConVarBool(SM_hCustomMaxDistance) && GetCustomMapMaxScore() > -1) PrintToChat(client, "\x01[\x05Confogl\x01] Custom Max Distance: \x04%d", GetCustomMapMaxScore());
+        if (SM_cvCustomMaxDistance.BoolValue && GetCustomMapMaxScore() > -1) PrintToChat(client, "\x01[\x05Confogl\x01] Custom Max Distance: \x04%d", GetCustomMapMaxScore());
     }
     else
     {
         PrintToServer("[Confogl] Health Bonus: %d", iScore );
         if (SM_fSurvivalBonusRatio != 0.0) PrintToServer("[Confogl] Static Survival Bonus Per Survivor: %d", RoundToFloor(400 * SM_fMapMulti * SM_fSurvivalBonusRatio));
-        if (GetConVarBool(SM_hCustomMaxDistance) && GetCustomMapMaxScore() > -1) PrintToServer("[Confogl] Custom Max Distance: %d", GetCustomMapMaxScore());
+        if (SM_cvCustomMaxDistance.BoolValue && GetCustomMapMaxScore() > -1) PrintToServer("[Confogl] Custom Max Distance: %d", GetCustomMapMaxScore());
     }
 
 
 }
 
-stock SM_CalculateSurvivalBonus()
+stock int SM_CalculateSurvivalBonus()
 {
     return RoundToFloor(SM_CalculateAvgHealth() * SM_fMapMulti * SM_fHBRatio + 400 * SM_fMapMulti * SM_fSurvivalBonusRatio);
 }
 
-stock SM_CalculateScore()
+stock int SM_CalculateScore()
 {
-    decl iAliveCount;
-    new Float:fScore = SM_CalculateAvgHealth(iAliveCount);
+    int iAliveCount;
+    float fScore = SM_CalculateAvgHealth(iAliveCount);
+
     return RoundToFloor(fScore * SM_fMapMulti * SM_fHBRatio + 400 * SM_fMapMulti * SM_fSurvivalBonusRatio) * iAliveCount;
 }
 
-stock Float:SM_CalculateAvgHealth(&iAliveCount=0)
+stock float SM_CalculateAvgHealth(int &iAliveCount = 0)
 {
-    new iTotalHealth;
-    new iTotalTempHealth[3];
+    int iTotalHealth;
+    int iTotalTempHealth[3];
 
-    new Float:fTotalAdjustedTempHealth;
-    new bool:IsFinale = IsMapFinale();
+    float fTotalAdjustedTempHealth;
+    bool IsFinale = IsMapFinale();
     // Temporary Storage Variables for inventory
-    new iTemp;
-    new iCurrHealth;
-    new iCurrTemp;
-    new iIncapCount;
-    decl String:strTemp[50];
+    int iTemp;
+    int iCurrHealth;
+    int iCurrTemp;
+    int iIncapCount;
+    char strTemp[50];
 
-    new iSurvCount;
-    iAliveCount =0;
+    int iSurvCount;
+    iAliveCount = 0;
 
-    for (new index = 1; index <= MaxClients; index++)
+    for (int index = 1; index <= MaxClients; index++)
     {
         if (IsSurvivor(index))
         {
@@ -327,22 +344,19 @@ stock Float:SM_CalculateAvgHealth(&iAliveCount=0)
                 if (!SM_IsPlayerIncap(index))
                 {
                     // Get Main health stats
+                    iCurrTemp   = GetSurvivorTempHealth(index);
                     iCurrHealth = GetSurvivorPermanentHealth(index);
-
-                    iCurrTemp = GetSurvivorTempHealth(index);
-
                     iIncapCount = GetSurvivorIncapCount(index);
-
                     // Adjust for kits
-                    iTemp = GetPlayerWeaponSlot(index, 3);
+                    iTemp       = GetPlayerWeaponSlot(index, 3);
                     if (iTemp > -1)
                     {
                         GetEdictClassname(iTemp, strTemp, sizeof(strTemp));
                         if (StrEqual(strTemp, "weapon_first_aid_kit"))
                         {
-                            iCurrHealth = RoundToFloor(iCurrHealth + ((100 - iCurrHealth) * SM_fHealPercent));
-                            iCurrTemp = 0;
+                            iCurrTemp   = 0;
                             iIncapCount = 0;
+                            iCurrHealth = RoundToFloor(iCurrHealth + ((100 - iCurrHealth) * SM_fHealPercent));
                         }
                     }
                     // Adjust for pills/adrenaline
@@ -350,7 +364,7 @@ stock Float:SM_CalculateAvgHealth(&iAliveCount=0)
                     if (iTemp > -1)
                     {
                         GetEdictClassname(iTemp, strTemp, sizeof(strTemp));
-                        if (StrEqual(strTemp, "weapon_pain_pills")) iCurrTemp += SM_iPillPercent;
+                        if (StrEqual(strTemp, "weapon_pain_pills"))      iCurrTemp += SM_iPillPercent;
                         else if (StrEqual(strTemp, "weapon_adrenaline")) iCurrTemp += SM_iAdrenPercent;
                     }
                     // Enforce max 100 total health points
@@ -358,15 +372,19 @@ stock Float:SM_CalculateAvgHealth(&iAliveCount=0)
                     iAliveCount++;
 
                     iTotalHealth += iCurrHealth;
-                    if (iIncapCount < 0 ) { iIncapCount = 0; } else if (iIncapCount > 2 ) { iIncapCount = 2; }
+                    if (iIncapCount < 0 )       iIncapCount = 0;
+                    else if (iIncapCount > 2 )  iIncapCount = 2;
                     iTotalTempHealth[iIncapCount] += iCurrTemp;
                 }
-                else if (!IsFinale) iAliveCount++;
+                else if (!IsFinale)
+                {
+                    iAliveCount++;
+                }
             }
         }
     }
 
-    for (new i; i < 3; i++) fTotalAdjustedTempHealth += iTotalTempHealth[i] * SM_fTempMulti[i];
+    for (int i; i < 3; i++) fTotalAdjustedTempHealth += iTotalTempHealth[i] * SM_fTempMulti[i];
 
     // Total Score = Average Health points * numAlive
 
@@ -374,7 +392,7 @@ stock Float:SM_CalculateAvgHealth(&iAliveCount=0)
     // Total Health Points = Total Permanent Health + Total Adjusted Temp Health
 
     // return Average Health Points
-    new Float:fAvgHealth  = (iTotalHealth + fTotalAdjustedTempHealth) / iSurvCount;
+    float fAvgHealth  = (iTotalHealth + fTotalAdjustedTempHealth) / iSurvCount;
 
     #if DEBUG_SM
         LogMessage("[ScoreMod] TotalPerm: %d TotalAdjustedTemp: %.02f SurvCount: %d AliveCount: %d AvgHealth: %.02f",
@@ -384,11 +402,11 @@ stock Float:SM_CalculateAvgHealth(&iAliveCount=0)
     return fAvgHealth;
 }
 
-public Action:SM_Command_Say(client, args)
+public Action SM_Command_Say(int client, int args)
 {
     if (!SM_bModuleIsEnabled || !IsPluginEnabled()) return Plugin_Continue;
 
-    decl String:sMessage[MAX_NAME_LENGTH];
+    char sMessage[MAX_NAME_LENGTH];
     GetCmdArg(1, sMessage, sizeof(sMessage));
 
     if (StrEqual(sMessage, "!health")) return Plugin_Handled;

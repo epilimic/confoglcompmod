@@ -1,65 +1,63 @@
 #pragma semicolon 1
+#pragma newdecls required
+
 #include <sourcemod>
 
 #if defined __CONFOGL_CONFIGS__
 #endinput
 #endif
-
 #define __CONFOGL_CONFIGS__
 
-static const String:customCfgDir[] = "cfgogl";
+static ConVar cvCustomConfig;
 
-static Handle:hCustomConfig;
-static String:configsPath[PLATFORM_MAX_PATH];
-static String:cfgPath[PLATFORM_MAX_PATH];
-static String:customCfgPath[PLATFORM_MAX_PATH];
-static DirSeparator;
+static char customCfgDir[] = "cfgogl";
+static char configsPath[PLATFORM_MAX_PATH];
+static char cfgPath[PLATFORM_MAX_PATH];
+static char customCfgPath[PLATFORM_MAX_PATH];
+static char DirSeparator;
 
-Configs_OnModuleStart()
+void Configs_OnModuleStart()
 {
     InitPaths();
-    hCustomConfig = CreateConVarEx("customcfg", "", "DONT TOUCH THIS CVAR! This is more magic bullshit!",FCVAR_DONTRECORD|FCVAR_UNLOGGED);
-    decl String:cfgString[64];
-    GetConVarString(hCustomConfig, cfgString, sizeof(cfgString));
+    cvCustomConfig = CreateConVarEx("customcfg", "", "DONT TOUCH THIS CVAR! This is more magic bullshit!", FCVAR_DONTRECORD | FCVAR_UNLOGGED);
+    char cfgString[64];
+    cvCustomConfig.GetString(cfgString, sizeof(cfgString));
     SetCustomCfg(cfgString);
-    ResetConVar(hCustomConfig);
+    cvCustomConfig.RestoreDefault();
 }
-Configs_APL()
+void Configs_APL()
 {
-    CreateNative("LGO_BuildConfigPath", _native_BuildConfigPath);
+    CreateNative("LGO_BuildConfigPath",  _native_BuildConfigPath);
     CreateNative("LGO_ExecuteConfigCfg", _native_ExecConfigCfg);
 }
 
-InitPaths()
+void InitPaths()
 {
     BuildPath(Path_SM, configsPath, sizeof(configsPath), "configs/confogl/");
-    BuildPath(Path_SM, cfgPath, sizeof(cfgPath), "../../cfg/");
-    DirSeparator= cfgPath[strlen(cfgPath)-1];
+    BuildPath(Path_SM, cfgPath,     sizeof(cfgPath),     "../../cfg/");
+    DirSeparator = cfgPath[strlen(cfgPath) - 1];
 }
 
-bool:SetCustomCfg(const String:cfgname[])
+bool SetCustomCfg(const char[] cfgname)
 {
-    if(!strlen(cfgname))
+    if (!strlen(cfgname))
     {
-        customCfgPath[0]=0;
-        ResetConVar(hCustomConfig);
-        if(IsDebugEnabled())
-        {
-            LogMessage("[Configs] Custom Config Path Reset - Using Default");
-        }
+        customCfgPath[0] = 0;
+        cvCustomConfig.RestoreDefault();
+        Debug_LogMessage("[Configs] Custom Config Path Reset - Using Default");
         return true;
     }
 
     Format(customCfgPath, sizeof(customCfgPath), "%s%s%c%s", cfgPath, customCfgDir, DirSeparator, cfgname);
-    if(!DirExists(customCfgPath))
+    if (!DirExists(customCfgPath))
     {
         LogError("[Configs] Custom config directory %s does not exist!", customCfgPath);
         // Revert customCfgPath
-        customCfgPath[0]=0;
+        customCfgPath[0] = 0;
         return false;
     }
-    new thislen = strlen(customCfgPath);
-    if(thislen+1 < sizeof(customCfgPath))
+    int thislen = strlen(customCfgPath);
+    if (thislen + 1 < sizeof(customCfgPath))
     {
         customCfgPath[thislen] = DirSeparator;
         customCfgPath[thislen+1] = 0;
@@ -71,81 +69,63 @@ bool:SetCustomCfg(const String:cfgname[])
         return false;
     }
 
-    SetConVarString(hCustomConfig, cfgname);
+    cvCustomConfig.SetString(cfgname);
 
     return true;
 }
 
-BuildConfigPath(String:buffer[], maxlength, const String:sFileName[])
+void BuildConfigPath(char[] buffer, int maxlength, const char[] sFileName)
 {
-    if(customCfgPath[0])
+    if (customCfgPath[0])
     {
         Format(buffer, maxlength, "%s%s", customCfgPath, sFileName);
-        if(FileExists(buffer))
+        if (FileExists(buffer))
         {
-            if(IsDebugEnabled())
-            {
-                LogMessage("[Configs] Built custom config path: %s", buffer);
-            }
+            Debug_LogMessage("[Configs] Built custom config path: %s", buffer);
             return;
         }
         else
         {
-            if(IsDebugEnabled())
-            {
-                LogMessage("[Configs] Custom config not available: %s", buffer);
-            }
+            Debug_LogMessage("[Configs] Custom config not available: %s", buffer);
         }
     }
 
     Format(buffer, maxlength, "%s%s", configsPath, sFileName);
-    if(IsDebugEnabled())
-    {
-            LogMessage("[Configs] Built default config path: %s", buffer);
-    }
+    Debug_LogMessage("[Configs] Built default config path: %s", buffer);
 
 }
 
-ExecuteCfg(const String:sFileName[])
+void ExecuteCfg(const char[] sFileName)
 {
-    if(strlen(sFileName) == 0)
+    if (strlen(sFileName) == 0)
     {
         return;
     }
 
-    decl String:sFilePath[PLATFORM_MAX_PATH];
+    char sFilePath[PLATFORM_MAX_PATH];
 
-    if(customCfgPath[0])
+    if (customCfgPath[0])
     {
         Format(sFilePath, sizeof(sFilePath), "%s%s", customCfgPath, sFileName);
-        if(FileExists(sFilePath))
+        if (FileExists(sFilePath))
         {
-            if(IsDebugEnabled())
-            {
-                LogMessage("[Configs] Executing custom cfg file %s", sFilePath);
-            }
+            Debug_LogMessage("[Configs] Executing custom cfg file %s", sFilePath);
             ServerCommand("exec %s%s", customCfgPath[strlen(cfgPath)], sFileName);
 
             return;
         }
         else
         {
-            if(IsDebugEnabled())
-            {
-                LogMessage("[Configs] Couldn't find custom cfg file %s, trying default", sFilePath);
-            }
+            Debug_LogMessage("[Configs] Couldn't find custom cfg file %s, trying default", sFilePath);
         }
     }
 
     Format(sFilePath, sizeof(sFilePath), "%s%s", cfgPath, sFileName);
 
 
-    if(FileExists(sFilePath))
+    if (FileExists(sFilePath))
     {
-        if(IsDebugEnabled())
-        {
-            LogMessage("[Configs] Executing default config %s", sFilePath);
-        }
+        Debug_LogMessage("[Configs] Executing default config %s", sFilePath);
         ServerCommand("exec %s", sFileName);
     }
     else
@@ -154,26 +134,26 @@ ExecuteCfg(const String:sFileName[])
     }
 }
 
-public _native_BuildConfigPath(Handle:plugin, numParams)
+public int _native_BuildConfigPath(Handle plugin, int numParams)
 {
-    decl len;
+    int len;
     GetNativeStringLength(3, len);
-    new String:filename[len+1];
-    GetNativeString(3, filename, len+1);
+    char[] filename = new char[len + 1];
+    GetNativeString(3, filename, len + 1);
 
     len = GetNativeCell(2);
-    new String:buf[len];
+    char[] buf = new char[len];
     BuildConfigPath(buf, len, filename);
 
     SetNativeString(1, buf, len);
 }
 
-public _native_ExecConfigCfg(Handle:plugin, numParams)
+public int _native_ExecConfigCfg(Handle plugin, int numParams)
 {
-    decl len;
+    int len;
     GetNativeStringLength(1, len);
-    new String:filename[len+1];
-    GetNativeString(1, filename, len+1);
+    char[] filename = new char[len + 1];
+    GetNativeString(1, filename, len + 1);
 
     ExecuteCfg(filename);
 }

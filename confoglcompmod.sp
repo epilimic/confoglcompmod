@@ -1,13 +1,8 @@
 #pragma semicolon 1
-
-#if defined(AUTOVERSION)
-#include "version.inc"
-#else
-#define PLUGIN_VERSION  "2.2.3"
-#endif
+#pragma newdecls required
 
 #if !defined(DEBUG_ALL)
-#define DEBUG_ALL   0
+#define DEBUG_ALL       0
 #endif
 
 #include <sourcemod>
@@ -40,16 +35,16 @@
 #include "modules/ClientSettings.sp"
 #include "modules/ItemTracking.sp"
 
-public Plugin:myinfo = 
+public Plugin myinfo =
 {
-    name = "Confogl's Competitive Mod",
-    author = "Confogl Team",
+    name        = "Confogl's Competitive Mod",
+    author      = "Confogl Team, 0x0c",
     description = "A competitive mod for L4D2",
-    version = PLUGIN_VERSION,
-    url = "http://confogl.googlecode.com/"
+    version     = "2.2.4",
+    url         = "https://github.com/keyCat/confoglcompmod"
 }
 
-public OnPluginStart()
+public void OnPluginStart()
 {
     Debug_OnModuleStart();
     Configs_OnModuleStart();
@@ -77,12 +72,11 @@ public OnPluginStart()
     WC_OnModuleStart();
     CLS_OnModuleStart();
     IT_OnModuleStart();
-    //SH_OnModuleStart();
 
-    AddCustomServerTag("confogl", true);
+    AddCustomServerTag("confogl");
 }
 
-public APLRes:AskPluginLoad2(Handle:myself, bool:late, String:error[], err_max)
+public APLRes AskPluginLoad2(Handle myself, bool late, char[] error, int err_max)
 {
     RM_APL();
     Configs_APL();
@@ -90,7 +84,7 @@ public APLRes:AskPluginLoad2(Handle:myself, bool:late, String:error[], err_max)
     RegPluginLibrary("confogl");
 }
 
-public OnPluginEnd()
+public void OnPluginEnd()
 {
     CVS_OnModuleEnd();
     PS_OnModuleEnd();
@@ -101,12 +95,12 @@ public OnPluginEnd()
     RemoveCustomServerTag("confogl");
 }
 
-public OnGameFrame()
+public void OnGameFrame()
 {
     WS_OnGameFrame();
 }
 
-public OnMapStart()
+public void OnMapStart()
 {
     MI_OnMapStart();
     RM_OnMapStart();
@@ -116,7 +110,7 @@ public OnMapStart()
     IT_OnMapStart();
 }
 
-public OnMapEnd()
+public void OnMapEnd()
 {
     MI_OnMapEnd();
     WI_OnMapEnd();
@@ -125,28 +119,26 @@ public OnMapEnd()
     WS_OnMapEnd();
 }
 
-public OnConfigsExecuted()
+public void OnConfigsExecuted()
 {
     CVS_OnConfigsExecuted();
 }
 
-public OnClientDisconnect(client)
+public void OnClientDisconnect(int client)
 {
     RM_OnClientDisconnect(client);
-    //GT_OnClientDisconnect(client);
-    //SH_OnClientDisconnect(client);
 }
 
-public OnClientPutInServer(client)
+public void OnClientPutInServer(int client)
 {
     RM_OnClientPutInServer();
     UL_OnClientPutInServer();
     PS_OnClientPutInServer(client);
 }
 
-public Action:OnPlayerRunCmd(client, &buttons, &impulse, Float:vel[3], Float:angles[3], &weapon)
+public Action OnPlayerRunCmd(int client, int &buttons, int &impulse, float vel[3], float angles[3], int &weapon)
 {
-    if(GW_OnPlayerRunCmd(client, buttons))
+    if (GW_OnPlayerRunCmd(client, buttons))
     {
         return Plugin_Handled;
     }

@@ -1,65 +1,65 @@
 #pragma semicolon 1
+#pragma newdecls required
 
 #include <sourcemod>
 #include <sdktools>
 
-#define DEBUG_BS    0
+#define DEBUG_BS                0
 
-#define MAX_TANKS   5
-#define MAX_WITCHES 5
+#define MAX_TANKS               5
+#define MAX_WITCHES             5
 
-new Handle:BS_hEnabled;
+ConVar  BS_cvEnabled;
 
-new bool:BS_bEnabled = true;
-new bool:BS_bIsFirstRound = true;
-new bool:BS_bDeleteWitches = false;
-new bool:BS_bFinaleStarted = false;
-new bool:BS_bExpectTankSpawn = false;
+bool    BS_bEnabled             = true;
+bool    BS_bIsFirstRound        = true;
+bool    BS_bDeleteWitches       = false;
+bool    BS_bFinaleStarted       = false;
+bool    BS_bExpectTankSpawn     = false;
 
-new BS_iTankCount[2];
-new BS_iWitchCount[2];
+int     BS_iTankCount[2];
+int     BS_iWitchCount[2];
 
-new Float:BS_fTankSpawn[MAX_TANKS][3];
-new Float:BS_fWitchSpawn[MAX_WITCHES][2][3];
+float   BS_fTankSpawn[MAX_TANKS][3];
+float   BS_fWitchSpawn[MAX_WITCHES][2][3];
 
-new String:BS_sMap[64];
+char    BS_sMap[64];
 
-public BS_OnModuleStart()
+void BS_OnModuleStart()
 {
-    BS_hEnabled = CreateConVarEx("lock_boss_spawns", "1", "Enables forcing same coordinates for tank and witch spawns");
-    HookConVarChange(BS_hEnabled, BS_ConVarChange);
+    BS_cvEnabled = CreateConVarEx("lock_boss_spawns", "1", "Enables forcing same coordinates for tank and witch spawns");
+    BS_bEnabled  = BS_cvEnabled.BoolValue;
+    BS_cvEnabled.AddChangeHook(BS_ConVarChange);
 
-    BS_bEnabled = GetConVarBool(BS_hEnabled);
-
-    HookEvent("tank_spawn", BS_TankSpawn);
-    HookEvent("witch_spawn", BS_WitchSpawn);
-    HookEvent("round_end", BS_RoundEnd, EventHookMode_PostNoCopy);
+    HookEvent("tank_spawn",   BS_TankSpawn);
+    HookEvent("witch_spawn",  BS_WitchSpawn);
+    HookEvent("round_end",    BS_RoundEnd,    EventHookMode_PostNoCopy);
     HookEvent("finale_start", BS_FinaleStart, EventHookMode_PostNoCopy);
 }
 
-public BS_OnMapStart()
+public void BS_OnMapStart()
 {
-    BS_bIsFirstRound = true;
-    BS_bFinaleStarted = false;
+    BS_bIsFirstRound    = true;
+    BS_bFinaleStarted   = false;
     BS_bExpectTankSpawn = false;
-    BS_iTankCount[0] = 0;
-    BS_iTankCount[1] = 0;
-    BS_iWitchCount[0] = 0;
-    BS_iWitchCount[1] = 0;
+    BS_iTankCount[0]    = 0;
+    BS_iTankCount[1]    = 0;
+    BS_iWitchCount[0]   = 0;
+    BS_iWitchCount[1]   = 0;
 
     GetCurrentMap(BS_sMap, sizeof(BS_sMap));
 }
 
-public BS_ConVarChange(Handle:convar, const String:oldValue[], const String:newValue[])
+public void BS_ConVarChange(ConVar convar, const char[] oldValue, const char[] newValue)
 {
-    BS_bEnabled = GetConVarBool(BS_hEnabled);
+    BS_bEnabled = BS_cvEnabled.BoolValue;
 }
 
-public Action:BS_WitchSpawn(Handle:event, const String:name[], bool:dontBroadcast)
+public Action BS_WitchSpawn(Event event, const char[] name, bool dontBroadcast)
 {
     if (!BS_bEnabled || !IsPluginEnabled()) return;
 
-    new iWitch = GetEventInt(event, "witchid");
+    int iWitch = event.GetInt("witchid");
 
     if (BS_bDeleteWitches)
     {
@@ -74,7 +74,7 @@ public Action:BS_WitchSpawn(Handle:event, const String:name[], bool:dontBroadcas
     if (BS_bIsFirstRound)
     {
         // If it's the first round, track our witch.
-        GetEntPropVector(iWitch, Prop_Send, "m_vecOrigin", BS_fWitchSpawn[BS_iWitchCount[0]][0]);
+        GetEntPropVector(iWitch, Prop_Send, "m_vecOrigin",   BS_fWitchSpawn[BS_iWitchCount[0]][0]);
         GetEntPropVector(iWitch, Prop_Send, "m_angRotation", BS_fWitchSpawn[BS_iWitchCount[0]][1]);
         BS_iWitchCount[0]++;
     }
@@ -86,38 +86,38 @@ public Action:BS_WitchSpawn(Handle:event, const String:name[], bool:dontBroadcas
     }
 }
 
-Action:BS_OnTankSpawn_Forward()
+Action BS_OnTankSpawn_Forward()
 {
-    if(BS_bEnabled && IsPluginEnabled())
-        BS_bExpectTankSpawn = true;
+    if (BS_bEnabled && IsPluginEnabled()) BS_bExpectTankSpawn = true;
+
     return Plugin_Continue;
 }
 
-public Action:BS_TankSpawn(Handle:event, const String:name[], bool:dontBroadcast)
+public Action BS_TankSpawn(Event event, const char[] name, bool dontBroadcast)
 {
     if (!BS_bEnabled || !IsPluginEnabled()) return;
     // Don't touch tanks on finale events
     if (BS_bFinaleStarted) return;
     // Stop if this isn't the first tank_spawn for this tank
-    if(!BS_bExpectTankSpawn) return;
+    if (!BS_bExpectTankSpawn) return;
     BS_bExpectTankSpawn = false;
     // Don't track tank spawns on c5m5 or tank can spawn behind other team.
-    if(StrEqual(BS_sMap, "c5m5_bridge")) return;
+    if (StrEqual(BS_sMap, "c5m5_bridge")) return;
 
-    new iTankClient = GetClientOfUserId(GetEventInt(event, "userid"));
+    int iTankClient = GetClientOfUserId(event.GetInt("userid"));
 
     if (GetMapValueInt("tank_z_fix")) FixZDistance(iTankClient); // fix stuck tank spawns, ex c1m1
 
     // If we reach MAX_TANKS, we don't have any room to store their locations
     if (BS_iTankCount[!BS_bIsFirstRound] >= MAX_TANKS) return;
 
-    if(DEBUG_BS || IsDebugEnabled())
+    if (DEBUG_BS || IsDebugEnabled())
         LogMessage("[BS] Tracking this tank spawn. Currently, %d tanks", BS_iTankCount[!BS_bIsFirstRound]);
 
     if (BS_bIsFirstRound)
     {
         GetClientAbsOrigin(iTankClient, BS_fTankSpawn[BS_iTankCount[0]]);
-        if(DEBUG_BS || IsDebugEnabled())
+        if (DEBUG_BS || IsDebugEnabled())
             LogMessage("[BS] Saving tank at %f %f %f",
                 BS_fTankSpawn[BS_iTankCount[0]][0],
                 BS_fTankSpawn[BS_iTankCount[0]][1],
@@ -128,7 +128,7 @@ public Action:BS_TankSpawn(Handle:event, const String:name[], bool:dontBroadcast
     else if (BS_iTankCount[0] > BS_iTankCount[1])
     {
         TeleportEntity(iTankClient, BS_fTankSpawn[BS_iTankCount[1]], NULL_VECTOR, NULL_VECTOR);
-        if(DEBUG_BS || IsDebugEnabled())
+        if (DEBUG_BS || IsDebugEnabled())
             LogMessage("[BS] Teleporting tank to tank at %f %f %f",
                 BS_fTankSpawn[BS_iTankCount[1]][0],
                 BS_fTankSpawn[BS_iTankCount[1]][1],
@@ -136,7 +136,7 @@ public Action:BS_TankSpawn(Handle:event, const String:name[], bool:dontBroadcast
 
         BS_iTankCount[1]++;
     }
-    else if(DEBUG_BS || IsDebugEnabled())
+    else if (DEBUG_BS || IsDebugEnabled())
     {
         LogMessage("[BS] Not first round and not acceptable tank");
         LogMessage("[BS] IsFirstRound: %d  R1Count: %d R2Count: %d",
@@ -144,11 +144,11 @@ public Action:BS_TankSpawn(Handle:event, const String:name[], bool:dontBroadcast
     }
 }
 
-public Action:BS_RoundEnd(Handle:event, const String:name[], bool:dontBroadcast)
+public Action BS_RoundEnd(Event event, const char[] name, bool dontBroadcast)
 {
-    BS_bIsFirstRound = false;
-    BS_bFinaleStarted = false;
-    if(StrEqual(BS_sMap, "c6m1_riverbank")) {
+    BS_bIsFirstRound      = false;
+    BS_bFinaleStarted     = false;
+    if (StrEqual(BS_sMap, "c6m1_riverbank")) {
         BS_bDeleteWitches = false;
     } else {
         BS_bDeleteWitches = true;
@@ -156,18 +156,21 @@ public Action:BS_RoundEnd(Handle:event, const String:name[], bool:dontBroadcast)
     }
 }
 
-public Action:BS_FinaleStart(Handle:event, const String:name[], bool:dontBroadcast) BS_bFinaleStarted = true;
+public Action BS_FinaleStart(Event event, const char[] name, bool dontBroadcast)
+{
+    BS_bFinaleStarted = true;
+}
 
-public Action:BS_WitchTimerReset(Handle:timer)
+public Action BS_WitchTimerReset(Handle timer)
 {
     BS_bDeleteWitches = false;
 }
 
-FixZDistance(iTankClient)
+void FixZDistance(int iTankClient)
 {
-    decl Float:TankLocation[3];
-    decl Float:TempSurvivorLocation[3];
-    decl index;
+    int index;
+    float TankLocation[3];
+    float TempSurvivorLocation[3];
 
     GetClientAbsOrigin(iTankClient, TankLocation);
 
@@ -176,10 +179,10 @@ FixZDistance(iTankClient)
         LogMessage("[BS] tank z spawn check... Map: %s, Tank Location: %f, %f, %f", BS_sMap, TankLocation[0], TankLocation[1], TankLocation[2]);
     }
 
-    for (new i = 0; i < NUM_OF_SURVIVORS; i++)
+    for (int i = 0; i < NUM_OF_SURVIVORS; i++)
     {
-        new Float:distance = GetMapValueFloat("max_tank_z", 99999999999999.9);
         index = GetSurvivorIndex(i);
+        float distance = GetMapValueFloat("max_tank_z", 99999999999999.9);
         if (index != 0 && IsValidEntity(index))
         {
             GetClientAbsOrigin(index, TempSurvivorLocation);
@@ -188,7 +191,7 @@ FixZDistance(iTankClient)
 
             if (FloatAbs(TempSurvivorLocation[2] - TankLocation[2]) > distance)
             {
-                new Float:WarpToLocation[3];
+                float WarpToLocation[3];
                 GetMapValueVector("tank_warpto", WarpToLocation);
                 if (!GetVectorLength(WarpToLocation, true))
                 {
