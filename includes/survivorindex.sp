@@ -6,89 +6,89 @@ new iSurvivorIndex[NUM_OF_SURVIVORS] = 0;
 
 SI_OnModuleStart()
 {
-	HookEvent("round_start"			, SI_BuildIndex_Event);
-	HookEvent("round_end"			, SI_BuildIndex_Event);
-	HookEvent("player_spawn"		, SI_BuildIndex_Event);
-	HookEvent("player_disconnect"	, SI_BuildIndex_Event);
-	HookEvent("player_death"		, SI_BuildIndex_Event);
-	HookEvent("player_bot_replace"	, SI_BuildIndex_Event);
-	HookEvent("bot_player_replace"	, SI_BuildIndex_Event);
-	HookEvent("defibrillator_used"	, SI_BuildIndex_Event);
-	HookEvent("player_team"			, SI_BuildIndexDelay_Event);
+    HookEvent("round_start"         , SI_BuildIndex_Event);
+    HookEvent("round_end"           , SI_BuildIndex_Event);
+    HookEvent("player_spawn"        , SI_BuildIndex_Event);
+    HookEvent("player_disconnect"   , SI_BuildIndex_Event);
+    HookEvent("player_death"        , SI_BuildIndex_Event);
+    HookEvent("player_bot_replace"  , SI_BuildIndex_Event);
+    HookEvent("bot_player_replace"  , SI_BuildIndex_Event);
+    HookEvent("defibrillator_used"  , SI_BuildIndex_Event);
+    HookEvent("player_team"         , SI_BuildIndexDelay_Event);
 }
 
 SI_BuildIndex()
 {
-	if (!IsServerProcessing() || !IsPluginEnabled()){return;}
-	
-	new ifoundsurvivors = 0;
-	decl character;
+    if (!IsServerProcessing() || !IsPluginEnabled()){return;}
 
-	// Make sure kicked survivors don't freak us out.
-	for(new i = 0; i < NUM_OF_SURVIVORS;i++)
-		iSurvivorIndex[i]=0;
+    new ifoundsurvivors = 0;
+    decl character;
 
-	for (new client = 1; client <= MaxClients; client++)
-	{
-		if (ifoundsurvivors == NUM_OF_SURVIVORS)
-		{
-			break;
-		}
+    // Make sure kicked survivors don't freak us out.
+    for(new i = 0; i < NUM_OF_SURVIVORS;i++)
+        iSurvivorIndex[i]=0;
 
-		if (!IsClientInGame(client) || GetClientTeam(client) != 2)
-		{
-			continue;
-		}
+    for (new client = 1; client <= MaxClients; client++)
+    {
+        if (ifoundsurvivors == NUM_OF_SURVIVORS)
+        {
+            break;
+        }
 
-		character = GetEntProp(client,Prop_Send,"m_survivorCharacter");
-		ifoundsurvivors++;
+        if (!IsClientInGame(client) || GetClientTeam(client) != 2)
+        {
+            continue;
+        }
 
-		if (character > 3 || character < 0)
-		{
-			continue;
-		}
+        character = GetEntProp(client,Prop_Send,"m_survivorCharacter");
+        ifoundsurvivors++;
 
-		iSurvivorIndex[character] = 0;
+        if (character > 3 || character < 0)
+        {
+            continue;
+        }
 
-		if (!IsPlayerAlive(client))
-		{
-			continue;
-		}
+        iSurvivorIndex[character] = 0;
 
-		iSurvivorIndex[character] = client;
-	}
+        if (!IsPlayerAlive(client))
+        {
+            continue;
+        }
+
+        iSurvivorIndex[character] = client;
+    }
 }
 
 public SI_BuildIndexDelay_Event(Handle:event, const String:name[], bool:dontBroadcast)
 {
-	CreateTimer(0.3, SI_BuildIndex_Timer);
+    CreateTimer(0.3, SI_BuildIndex_Timer);
 }
 
 public Action:SI_BuildIndex_Timer(Handle:timer)
 {
-	SI_BuildIndex();
+    SI_BuildIndex();
 }
 
 public SI_BuildIndex_Event(Handle:event, const String:name[], bool:dontBroadcast)
 {
-	SI_BuildIndex();
+    SI_BuildIndex();
 }
 
 GetSurvivorIndex(index)
 {
-	if (index < 0 || index > 3)
-	{
-		return 0;
-	}
+    if (index < 0 || index > 3)
+    {
+        return 0;
+    }
 
-	return iSurvivorIndex[index];
+    return iSurvivorIndex[index];
 }
 
 bool:IsAnySurvivorsAlive()
 {
-	for(new index = 0;index < NUM_OF_SURVIVORS; index++)
-	{
-		if (iSurvivorIndex[index]) return true;
-	}
-	return false;
+    for(new index = 0;index < NUM_OF_SURVIVORS; index++)
+    {
+        if (iSurvivorIndex[index]) return true;
+    }
+    return false;
 }
