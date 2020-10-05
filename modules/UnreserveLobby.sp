@@ -2,7 +2,7 @@
 
 #include <sourcemod>
 #include <sdktools>
-#include <left4downtown>
+#include <left4dhooks>
 
 new Handle:UL_hEnable;
 // native L4D_LobbyUnreserve();
@@ -16,24 +16,19 @@ UL_OnModuleStart()
 
 bool:UL_CheckVersion()
 {
-	if(FindConVar("left4downtown_version") != INVALID_HANDLE) 
-	{
-		return false;
-	}
-	
-	return true;
+	return FindConVar("left4dhooks_version") == INVALID_HANDLE;
 }
 
 UL_OnClientPutInServer()
 {
 	if(!IsPluginEnabled() || !GetConVarBool(UL_hEnable)){return;}
-	
+
 	if(UL_CheckVersion())
 	{
-		LogError("Failed to unreserve lobby. Left4Downtown is outdated!");
+		LogError("Failed to unreserve lobby. Left4Dhooks is outdated!");
 		return;
 	}
-	
+
 	L4D_LobbyUnreserve();
 }
 
@@ -41,9 +36,9 @@ public Action:UL_KillLobbyRes(client,args)
 {
 	if(UL_CheckVersion())
 	{
-		LogError("Failed to unreserve lobby. Left4Downtown is outdated!");
+		LogError("Failed to unreserve lobby. Left4Dhooks is outdated!");
 		return;
 	}
-	
+
 	L4D_LobbyUnreserve();
 }

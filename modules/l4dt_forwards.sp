@@ -1,6 +1,6 @@
 #include <sourcemod>
 #include <sdktools>
-#include <left4downtown>
+#include <left4dhooks>
 
 public Action:L4D_OnSpawnTank(const Float:vector[3], const Float:qangle[3])
 {
@@ -14,7 +14,7 @@ public Action:L4D_OnSpawnMob(&amount)
 {
 	if(GT_OnSpawnMob_Forward(amount) == Plugin_Handled)
 		return Plugin_Handled;
-	
+
 	return Plugin_Continue;
 }
 

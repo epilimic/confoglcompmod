@@ -22,40 +22,40 @@ SI_BuildIndex()
 	if (!IsServerProcessing() || !IsPluginEnabled()){return;}
 	
 	new ifoundsurvivors = 0;
-	decl char;
-	
+	decl character;
+
 	// Make sure kicked survivors don't freak us out.
 	for(new i = 0; i < NUM_OF_SURVIVORS;i++)
 		iSurvivorIndex[i]=0;
-	
+
 	for (new client = 1; client <= MaxClients; client++)
 	{
 		if (ifoundsurvivors == NUM_OF_SURVIVORS)
 		{
 			break;
 		}
-		
+
 		if (!IsClientInGame(client) || GetClientTeam(client) != 2)
 		{
 			continue;
 		}
-		
-		char = GetEntProp(client,Prop_Send,"m_survivorCharacter");
+
+		character = GetEntProp(client,Prop_Send,"m_survivorCharacter");
 		ifoundsurvivors++;
-		
-		if (char > 3 || char < 0)
+
+		if (character > 3 || character < 0)
 		{
 			continue;
 		}
-		
-		iSurvivorIndex[char] = 0;
-		
+
+		iSurvivorIndex[character] = 0;
+
 		if (!IsPlayerAlive(client))
 		{
 			continue;
 		}
-		
-		iSurvivorIndex[char] = client;
+
+		iSurvivorIndex[character] = client;
 	}
 }
 
@@ -80,7 +80,7 @@ GetSurvivorIndex(index)
 	{
 		return 0;
 	}
-	
+
 	return iSurvivorIndex[index];
 }
 
