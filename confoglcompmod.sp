@@ -12,7 +12,6 @@
 
 #include <sourcemod>
 #include <sdktools>
-#include <socket>
 #include <sdkhooks>
 #include <left4downtown>
 #include "includes/constants.sp"
@@ -33,7 +32,6 @@
 #include "modules/UnprohibitBosses.sp"
 #include "modules/PasswordSystem.sp"
 #include "modules/BotKick.sp"
-#include "modules/CheckVersion.sp"
 #include "modules/EntityRemover.sp"
 #include "modules/ScoreMod.sp"
 #include "modules/FinaleSpawn.sp"
@@ -42,7 +40,6 @@
 #include "modules/l4dt_forwards.sp"
 #include "modules/ClientSettings.sp"
 #include "modules/ItemTracking.sp"
-//#include "modules/SpectatorHud.sp"
 
 public Plugin:myinfo = 
 {
@@ -74,8 +71,7 @@ public OnPluginStart()
 	UB_OnModuleStart();
 	
 	BK_OnModuleStart();
-	CV_OnModuleStart();
-	
+
 	SM_OnModuleStart();
 	FS_OnModuleStart();
 	BS_OnModuleStart();
@@ -147,7 +143,6 @@ public OnClientPutInServer(client)
 	RM_OnClientPutInServer();
 	UL_OnClientPutInServer();
 	PS_OnClientPutInServer(client);
-	CV_OnClientPutInServer();
 }
 
 public Action:OnPlayerRunCmd(client, &buttons, &impulse, Float:vel[3], Float:angles[3], &weapon)
