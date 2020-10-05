@@ -21,7 +21,6 @@
 #include "modules/CvarSettings.sp"
 #include "modules/GhostTank.sp"
 #include "modules/WaterSlowdown.sp"
-#include "modules/UnreserveLobby.sp"
 #include "modules/GhostWarp.sp"
 #include "modules/UnprohibitBosses.sp"
 #include "modules/PasswordSystem.sp"
@@ -56,7 +55,6 @@ public void OnPluginStart()
 
     CVS_OnModuleStart();
     PS_OnModuleStart();
-    UL_OnModuleStart();
 
     ER_OnModuleStart();
     GW_OnModuleStart();
@@ -132,7 +130,6 @@ public void OnClientDisconnect(int client)
 public void OnClientPutInServer(int client)
 {
     RM_OnClientPutInServer();
-    UL_OnClientPutInServer();
     PS_OnClientPutInServer(client);
 }
 
