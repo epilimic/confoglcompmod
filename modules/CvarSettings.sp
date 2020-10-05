@@ -167,10 +167,11 @@ static ClearAllSettings()
 	for (new i; i < GetArraySize(CvarSettingsArray); i++)
 	{
 		GetArrayArray(CvarSettingsArray, i, cvsetting[0]);
-		
+
 		UnhookConVarChange(cvsetting[CVSE_cvar], CVS_ConVarChange);
 		SetConVarString(cvsetting[CVSE_cvar], cvsetting[CVSE_oldval]);
 	}
+
 	ClearArray(CvarSettingsArray);
 }
 

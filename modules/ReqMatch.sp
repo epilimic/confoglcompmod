@@ -151,7 +151,7 @@ RM_Match_Unload(bool:bForced=false)
 	if(!IsHumansOnServer() || bForced)
 	{
 		if(RM_DEBUG || IsDebugEnabled())
-			LogMessage("%s Match ís no longer active, sb_all_bot_game reset to 0, IsHumansOnServer %b, bForced %b",RM_DEBUG_PREFIX,IsHumansOnServer(),bForced);
+			LogMessage("%s Match ?s no longer active, sb_all_bot_game reset to 0, IsHumansOnServer %b, bForced %b",RM_DEBUG_PREFIX,IsHumansOnServer(),bForced);
 		
 		RM_bIsAMatchActive = false;
 		SetConVarInt(FindConVar("sb_all_bot_game"),0);
@@ -211,7 +211,22 @@ RM_UpdateCfgOn(const String:cfgfile[])
 
 public Action:RM_Cmd_ForceMatch(client, args)
 {
-	if(RM_bIsMatchModeLoaded){return Plugin_Handled;}
+	if(RM_bIsMatchModeLoaded)
+	{
+		if (RM_DEBUG || IsDebugEnabled())
+			LogMessage("%s Unloading match mode...", RM_DEBUG_PREFIX);
+
+		Call_StartForward(RM_hFwdMatchUnload);
+		Call_Finish();
+
+		if (RM_DEBUG || IsDebugEnabled())
+			LogMessage("%s Match mode unloaded!", RM_DEBUG_PREFIX);
+		RM_bIsMatchModeLoaded = false;
+		IsPluginEnabled(true, false);
+		RM_bIsMapRestarted = false;
+		RM_bIsPluginsLoaded = false;
+		RM_bIsAMatchActive = false;
+	}
 	
 	if(RM_DEBUG || IsDebugEnabled())
 		LogMessage("%s Match mode forced to load!",RM_DEBUG_PREFIX);
